@@ -40,8 +40,8 @@ u8* KernelStack=NULL;
 #define PAGE_LARGE    (1ULL << 7)
 #define PAGE_HUGE     (1ULL << 7)
 
-void* GopOut=NULL;
-HDR_PIXEL* GopBack=NULL;
+u32* GopOut=NULL;
+u32* GopBack=NULL;
 u8 SystemMode=0;
 
 EFI_BOOT_SERVICES *bs=NULL;
@@ -631,7 +631,7 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
     }
     MemCopy(&GopMode,Gop->Mode,sizeof(EFI_GOP_MODE));
     MemCopy(&GopInfo,Gop->Mode->Info,sizeof(EFI_GOP_MODE_INFO));
-    GopMode.FrameBufferSize=GopInfo.PixelsPerScanLine * GopInfo.VerticalResolution * sizeof(HDR_PIXEL);
+    GopMode.FrameBufferSize=GopInfo.PixelsPerScanLine * GopInfo.VerticalResolution * sizeof(u32);
     GopOut=(u32*)(u64)GopMode.FrameBufferBase;
     DebugStr("Gop->Mode->Info->PixelFormat = ");
     DebugU32(Gop->Mode->Info->PixelFormat);
@@ -924,7 +924,7 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
     KernelStack=(u8*)KernelStackAddr;
     MemSet(KernelStack,0,KERNEL_STACK_SIZE);
     
-    MemSet(GopOut,0xFF,GopMode.FrameBufferSize>>2);
+    MemSet(GopOut,0xFF,GopMode.FrameBufferSize);
     __asm__("sfence");
 
     DebugStr("allocated at 0x");
@@ -960,7 +960,7 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
         :: "r"(StackTop) : "memory"
     );
     DebugStr("AllocStack.\n");
-    GopBack = (HDR_PIXEL*)(u64)AlignedAlloc(&KernelPool, GopInfo.PixelsPerScanLine * GopInfo.VerticalResolution * sizeof(HDR_PIXEL), 64);
+    GopBack = (u32*)(u64)AlignedAlloc(&KernelPool, GopInfo.PixelsPerScanLine * GopInfo.VerticalResolution * sizeof(u32), 64);
 
     LoadGDT();
     InitIDT();
@@ -1373,7 +1373,7 @@ typedef struct {
 __attribute__((force_align_arg_pointer)) void kernel_main() {
     DebugStr("Jumped To KernelMain.\n");
     InitStacks();
-    GOPClear(HDR_Pack(0x0000, 0xAAAA, 0xAAAA, 0xFFFF));
+    GOPClear(PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
     GOPFlash();
     MemSet((u8*)APAPICIDsBusy,0,288);
     SetCurrentCoreId(0) ;
@@ -1381,7 +1381,7 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     WaitForAllAPNotBusy();
 
     DebugStr("Cores Init Finish\n");
-    GOPClear(HDR_Pack(0x0000, 0x0000, 0x0000, 0xFFFF));
+    GOPClear(PACK_COLOR(0x00, 0x00, 0x00, 0xFF));
     GOPFlash();
     
     if (!KernelPool.Head) {
@@ -1408,7 +1408,7 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
         while(1) __asm__ volatile("cli\n\t hlt");
     }
     
-    GopMode.FrameBufferSize = GopInfo.PixelsPerScanLine * GopInfo.VerticalResolution * sizeof(HDR_PIXEL);
+    GopMode.FrameBufferSize = GopInfo.PixelsPerScanLine * GopInfo.VerticalResolution * sizeof(u32);
     DebugStr("GopBack = ");
     DebugU64((u64)GopBack);
     DebugChar('\n');
@@ -1447,7 +1447,7 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
         DebugStr("Mouse enable ACK: ");
         DebugU8(ack);
         DebugStr("\n");
-        GOPClear(HDR_Pack(0x0000, 0xFFFF, 0xFFFF, 0xFFFF));
+        GOPClear(PACK_COLOR(0x00, 0xFF, 0xFF, 0xFF));
         GOPFlash();
         while (inb(0x64) & 0x02);
         outb(0x60, 0xF4);
@@ -1458,7 +1458,7 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
                 if (ack == 0xFA) break;
             }
         }
-        GOPClear(HDR_Pack(0x0000, 0x0000, 0xFFFF, 0xFFFF));
+        GOPClear(PACK_COLOR(0000, 0x00, 0xFF, 0xFF));
         GOPFlash();
     }
 
@@ -1489,7 +1489,7 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     DebugU32(high);
     DebugStr("\n");
 
-    GOPClear(HDR_Pack(0xA5A5, 0xA5A5, 0xA5A5, 0xFFFF));
+    GOPClear(PACK_COLOR(0xA5, 0xA5, 0xA5, 0xFF));
     GOPFlash();
 
     u64 base = GetHPETMMIO(HPETAddr);
@@ -1581,7 +1581,7 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     DebugStr("Init Task\n");
     TaskInit();
 
-    GOPClear(HDR_Pack(0x7FFF, 0x7FFF, 0x7FFF, 0xFFFF));
+    GOPClear(PACK_COLOR(0x7F, 0x7F, 0x7F, 0xFF));
     GOPFlash();
 
     InitRandomString();
@@ -1639,7 +1639,7 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     __asm__("int $0x21");
     Char=0;
 
-    MemSet32(GopOut,0xA5A5A5FF,GopMode.FrameBufferSize>>2);
+    MemSet(GopOut,0xA5,GopMode.FrameBufferSize);
 
     DebugStr("WelCome To Temple, User.\n");
 
@@ -1653,13 +1653,13 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     u64 LastFrameTime = SystemGetTimeNano();
     while (1){
         WaitForEvent();
-        GOPClear(HDR_Pack(0x0000, 0x0000, 0x0000, 0xFFFF));
+        GOPClear(PACK_COLOR(0x00, 0x00, 0x00, 0xFF));
         for (u32 i = 0; i < repeat_count; i++) {
             GOPString(i * msg_len, 
                     GopInfo.VerticalResolution - 19, 
                     msg,
-                    HDR_Pack(0x0000, 0x0000, 0x0000, 0x0000),
-                    HDR_Pack(0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF),
+                    PACK_COLOR(0x00, 0x00, 0x00, 0x00),
+                    PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
                     KernelEnglishFonts);
         }
         Now = SystemGetTimeNano();
@@ -1668,11 +1668,11 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
 
         TaskPoll();
 
-        GOPRectFill((u32[2]){0, GopInfo.HorizontalResolution}, (u32[2]){0, 21}, HDR_Pack(0x0000, 0xAAAA, 0xAAAA, 0xFFFF));
-        GOPString(4,2,"Neuro-SamaOS :>)",HDR_Pack(0x0000, 0x0000, 0x0000, 0x0000),HDR_Pack(0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF),KernelEnglishFonts);
+        GOPRectFill((u32[2]){0, GopInfo.HorizontalResolution}, (u32[2]){0, 21}, PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
+        GOPString(4,2,"Neuro-SamaOS :>)",PACK_COLOR(0x00, 0x00, 0x00, 0x00),PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),KernelEnglishFonts);
 
-        GOPRectFill((u32[2]){GlobalPS2Mouse.X-5,GlobalPS2Mouse.X+5}, (u32[2]){GlobalPS2Mouse.Y-5,GlobalPS2Mouse.Y+5}, HDR_Pack(0x0000, 0x0000, 0x0000, 0xFFFF));
-        GOPRectFill((u32[2]){GlobalPS2Mouse.X-4,GlobalPS2Mouse.X+4}, (u32[2]){GlobalPS2Mouse.Y-4,GlobalPS2Mouse.Y+4}, HDR_Pack(0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF));
+        GOPRectFill((u32[2]){GlobalPS2Mouse.X-5,GlobalPS2Mouse.X+5}, (u32[2]){GlobalPS2Mouse.Y-5,GlobalPS2Mouse.Y+5}, PACK_COLOR(0x00, 0x00, 0x00, 0xFF));
+        GOPRectFill((u32[2]){GlobalPS2Mouse.X-4,GlobalPS2Mouse.X+4}, (u32[2]){GlobalPS2Mouse.Y-4,GlobalPS2Mouse.Y+4}, PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF));
         
         GOPFlash();
 

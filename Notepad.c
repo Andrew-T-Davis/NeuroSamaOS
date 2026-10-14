@@ -502,7 +502,7 @@ void GlobalNotepadDraw(void* Self) {
     GOPRectFill(
         (u32[2]){(u32)WinSelf->Base.x, (u32)WinSelf->Base.x + (u32)WinSelf->Base.w},
         (u32[2]){(u32)WinSelf->Base.y, (u32)WinSelf->Base.y + 22},
-        TextSelf->IsCommandMode ? HDR_Pack(0x8888, 0x0000, 0x8888, 0xFFFF) : HDR_Pack(0x0000, 0xAAAA, 0xAAAA, 0xFFFF)
+        TextSelf->IsCommandMode ? PACK_COLOR(0x88, 0x00, 0x88, 0xFF) : PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF)
     );
 
     char title_buf[64];
@@ -520,8 +520,8 @@ void GlobalNotepadDraw(void* Self) {
         (u32)WinSelf->Base.w,
         (u32)WinSelf->Base.h,
         title_buf,
-        HDR_Pack(0x0000, 0x0000, 0x0000, 0x0000),
-        HDR_Pack(0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF),
+        PACK_COLOR(0x0000, 0x0000, 0x0000, 0x0000),
+        PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
         KernelEnglishFonts
     );
 
@@ -529,7 +529,7 @@ void GlobalNotepadDraw(void* Self) {
     GOPRectFill(
         (u32[2]){(u32)WinSelf->Base.x, (u32)WinSelf->Base.x + (u32)WinSelf->Base.w},
         (u32[2]){(u32)WinSelf->Base.y + 20, (u32)WinSelf->Base.y + 20 + EditorHeight},
-        HDR_Pack(0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF)
+        PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF)
     );
 
     u32 LineNumX = (u32)WinSelf->Base.x + 4;
@@ -562,8 +562,8 @@ void GlobalNotepadDraw(void* Self) {
             30,
             19,
             line_num_str,
-            HDR_Pack(0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF),
-            HDR_Pack(0x8888, 0x8888, 0x8888, 0xFFFF),
+            PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
+            PACK_COLOR(0x88, 0x88, 0x88, 0xFF),
             KernelEnglishFonts
         );
     }
@@ -633,8 +633,8 @@ void GlobalNotepadDraw(void* Self) {
         (u32)WinSelf->Base.w - 30,
         (u32)WinSelf->Base.h - 38,
         display_buf,
-        HDR_Pack(0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF),
-        HDR_Pack(0x0000, 0x0000, 0x0000, 0xFFFF),
+        PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
+        PACK_COLOR(0x00, 0x00, 0x00, 0xFF),
         KernelEnglishFonts
     );
 
@@ -648,7 +648,7 @@ void GlobalNotepadDraw(void* Self) {
             GOPRectFill(
                 (u32[2]){CursorX, CursorX + CursorWidth},
                 (u32[2]){CursorY, CursorY + 19},
-                HDR_Pack(0x0000, 0x0000, 0x0000, 0xFFFF)
+                PACK_COLOR(0x00, 0x00, 0x00, 0xFF)
             );
         }
     }
@@ -657,7 +657,7 @@ void GlobalNotepadDraw(void* Self) {
     GOPRectFill(
         (u32[2]){(u32)WinSelf->Base.x, (u32)WinSelf->Base.x + (u32)WinSelf->Base.w},
         (u32[2]){StatusY, (u32)WinSelf->Base.y + (u32)WinSelf->Base.h + 2},
-        HDR_Pack(0xDDDD, 0xDDDD, 0xDDDD, 0xFFFF)
+        PACK_COLOR(0xDD, 0xDD, 0xDD, 0xFF)
     );
 
     char status_str[64];
@@ -697,8 +697,8 @@ void GlobalNotepadDraw(void* Self) {
         (u32)WinSelf->Base.w - 16,
         18,
         status_str,
-        HDR_Pack(0xDDDD, 0xDDDD, 0xDDDD, 0xFFFF),
-        HDR_Pack(0x3333, 0x3333, 0x3333, 0xFFFF),
+        PACK_COLOR(0xDD, 0xDD, 0xDD, 0xFF),
+        PACK_COLOR(0x33, 0x33, 0x33, 0xFF),
         KernelEnglishFonts
     );
 }

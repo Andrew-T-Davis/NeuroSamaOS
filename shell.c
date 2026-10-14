@@ -424,7 +424,7 @@ void GlobalShellDraw(void* Self) {
     GOPRectFill(
         (u32[2]){(u32)WinSelf->Base.x, (u32)WinSelf->Base.x + (u32)WinSelf->Base.w},
         (u32[2]){(u32)WinSelf->Base.y, (u32)WinSelf->Base.y + 20},
-        HDR_Pack(0x0000, 0xAAAA, 0xAAAA, 0xFFFF)
+        PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF)
     );
     GOPStringWH(
         (u32)WinSelf->Base.x + 4,
@@ -432,14 +432,14 @@ void GlobalShellDraw(void* Self) {
         (u32)WinSelf->Base.w,
         (u32)WinSelf->Base.h,
         WinSelf->Title ? WinSelf->Title : "Window",
-        HDR_Pack(0x0000, 0x0000, 0x0000, 0x0000),
-        HDR_Pack(0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF),
+        PACK_COLOR(0x00, 0x00, 0x00, 0x00),
+        PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
         KernelEnglishFonts
     );
     GOPRectFill(
         (u32[2]){(u32)WinSelf->Base.x, (u32)WinSelf->Base.x + (u32)WinSelf->Base.w},
         (u32[2]){(u32)WinSelf->Base.y + 20, (u32)WinSelf->Base.y + (u32)WinSelf->Base.h},
-        HDR_Pack(0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF)
+        PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF)
     );
     GOPStringWH(
         (u32)WinSelf->Base.x + (u32)TextSelf->Base.x,
@@ -447,8 +447,8 @@ void GlobalShellDraw(void* Self) {
         (u32)TextSelf->Base.w,
         (u32)TextSelf->Base.h,
         TextSelf->Text,
-        HDR_Pack(0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF),
-        HDR_Pack(0x0000, 0x0000, 0x0000, 0xFFFF),
+        PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
+        PACK_COLOR(0x00, 0x00, 0x00, 0xFF),
         KernelEnglishFonts
     );
 }
