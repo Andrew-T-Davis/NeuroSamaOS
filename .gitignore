@@ -7,3 +7,6 @@ Note.TXT
 OVMF.fd
 tmp.txt
 words.txt
+*.iso
+*.img
+*.bin
