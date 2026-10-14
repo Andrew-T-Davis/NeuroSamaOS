@@ -1,0 +1,9 @@
+./mnt
+./mnt/*
+./.vscode
+./.vscode/*
+./.clangd
+./Note.TXT
+./OVMF.fd
+./tmp.txt
+./words.txt
