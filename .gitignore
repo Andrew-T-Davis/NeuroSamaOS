@@ -11,3 +11,7 @@ words.txt
 *.img
 *.bin
 *.o
+*.efi
+*.log
+disk
+disk/*

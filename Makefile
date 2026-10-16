@@ -272,7 +272,7 @@ iso: boot.efi
 	@echo "ISO generated successfully"
 
 clean:
-	sudo rm -fr *.o boot.exe boot.efi boot.dll qemu.log NeuroSamaOS.iso  PciNet.log *.bin *.elf disk
+	rm -fr *.o boot.exe boot.efi boot.dll qemu.log NeuroSamaOS.iso  PciNet.log *.bin *.elf disk
 
 clear:
-	sudo rm -fr *.o boot.exe boot.efi boot.dll qemu.log NeuroSamaOS.iso  PciNet.log *.bin *.elf disk
+	rm -fr *.o boot.exe boot.efi boot.dll qemu.log NeuroSamaOS.iso  PciNet.log *.bin *.elf disk

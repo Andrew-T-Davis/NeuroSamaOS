@@ -1,4 +1,5 @@
 #include "xhci.h"
+#include "flash.h"
 #include "int.h"
 #include "pci.h"
 #include "kmalloc.h"
@@ -133,12 +134,14 @@ __attribute__((naked)) void XHCIInt(){
     );
 }
 
-void SendCommandRing(xHCIController* Ctrl, xHCITransferRequestBlock TRB, u64 Idx){
+void SendCommandRingWriteOnly(xHCIController* Ctrl, xHCITransferRequestBlock TRB, u64 Idx){
     Ctrl->CommandRingTRBs[Idx].NormalTRBField0.U = TRB.NormalTRBField0.U;
     Ctrl->CommandRingTRBs[Idx].NormalTRBField1.U = TRB.NormalTRBField1.U;
     Ctrl->CommandRingTRBs[Idx].NormalTRBField2.U = TRB.NormalTRBField2.U;
 
-    Ctrl->DoorbellRegs[0].U = (u32)Idx;
+    MemFlash();
+
+    Ctrl->DoorbellRegs[0].U = 0;
 }
 
 xHCIController* InitXHCI() {
@@ -253,7 +256,7 @@ xHCIController* InitXHCI() {
     Ctrl->OperationalRegs->USBCMD.rwInterrupterEnable=1;
     Ctrl->RuntimeRegs->Interrupter[0].IMAN.rwInterruptEnable=1;
     xHCITransferRequestBlock TRBs={{.U=0},{.U=0},{.CycleBit=1,.TRBType=9}};
-    SendCommandRing(Ctrl,TRBs,0);
+    SendCommandRingWriteOnly(Ctrl,TRBs,0);
 
     PrintRegsValue(Ctrl);
 
