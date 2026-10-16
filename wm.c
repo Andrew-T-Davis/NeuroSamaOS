@@ -27,11 +27,11 @@ void WMDelWindow(WM *WinM, const char *Title, u64 SomeID){
         return;
     }
     
-    int useTitle = (Title != NULL);
+    int UseTitle = (Title != NULL);
     Window* Node = WinM->Head;
     
     while (Node != NULL) {
-        int match = useTitle ? StrIs(Title, Node->Title) 
+        int match = UseTitle ? StrIs(Title, Node->Title) 
                              : (SomeID == Node->SomeID);
         if (match) break;
         Node = Node->Next;
@@ -63,12 +63,12 @@ void WMUpWindow(WM* WinM, const char* Title, u64 SomeID) {
     if (!WinM) return;
     if (!WinM->Head) return;
     
-    int useTitle = (Title != NULL);
+    int UseTitle = (Title != NULL);
     Window* Target = NULL;
     
     Window* Node = WinM->Head;
     while (Node != NULL) {
-        if (useTitle) {
+        if (UseTitle) {
             if (StrIs(Title, Node->Title)) { Target = Node; break; }
         } else {
             if (SomeID == Node->SomeID) { Target = Node; break; }
@@ -101,6 +101,36 @@ void WMUpWindow(WM* WinM, const char* Title, u64 SomeID) {
     DebugStr(" SomeID: 0x");
     DebugU64(WinM->Tail->SomeID);
     DebugChar('\n');
+}
+
+Window* WMWindowsTitleOverlapping(WM* WinM, Window* WinSelf, u64 TitleHight, u64 PointX, u64 PointY){
+    if (WinM == NULL || WinSelf == NULL) return NULL;
+
+    if (PointX >= WinSelf->Base.w || PointY >= TitleHight) {
+        return NULL;
+    }
+
+    u64 AbsX = WinSelf->Base.x + PointX;
+    u64 AbsY = WinSelf->Base.y + PointY;
+
+    Window* Hit = NULL;
+    Window* Node = WinM->Head;
+    while (Node != NULL) {
+        if (Node != WinSelf && Node->Base.Visible && !Node->Hide) {
+            u64 NodeL = Node->Base.x;
+            u64 NodeT = Node->Base.y;
+            u64 NodeR = Node->Base.x + Node->Base.w;
+            u64 NodeB = Node->Base.y + TitleHight;
+
+            if (AbsX >= NodeL && AbsX < NodeR &&
+                AbsY >= NodeT && AbsY < NodeB) {
+                Hit = Node;
+            }
+        }
+        Node = Node->Next;
+    }
+
+    return Hit;
 }
 
 void WMPollDraw(WM* WinM){

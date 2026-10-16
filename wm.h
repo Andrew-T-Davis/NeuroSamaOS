@@ -19,3 +19,4 @@ void WMDelWindow(WM *WinM, const char *Title, u64 SomeID);
 void WMUpWindow(WM *WinM, const char* Title, u64 SomeID);
 void WMPollDraw(WM* WinM);
 void WMPollPoll(WM* WinM);
+Window* WMWindowsTitleOverlapping(WM* WinM, Window* WinSelf, u64 TitleHight, u64 PointX, u64 PointY);

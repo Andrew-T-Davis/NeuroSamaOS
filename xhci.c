@@ -17,8 +17,8 @@ u64 GetXHCIMMIO(){
     return 0;
 }
 
-void PrintRegsAddr(xHCIController* Controller){
-    DebugStr("Regs Addr:\n");
+void PrintRegsValue(xHCIController* Controller){
+    DebugStr("Regs Value:\n");
     DebugStr("\tvolatile xHCIRegsCapability*  CapabilityRegs =0x");DebugU64((u64)Controller->CapabilityRegs); DebugStr(";\n");
     DebugStr("\tvolatile xHCIRegsOperational* OperationalRegs=0x");DebugU64((u64)Controller->OperationalRegs);DebugStr(";\n");
     DebugStr("\tvolatile xHCIRegsRuntime*     RuntimeRegs    =0x");DebugU64((u64)Controller->RuntimeRegs);    DebugStr(";\n");
@@ -60,10 +60,60 @@ void PrintRegsAddr(xHCIController* Controller){
     DebugStr("\tERSTBA =0x");DebugU64(Controller->RuntimeRegs->Interrupter[0].ERSTBA.U);DebugChar('\n');
     DebugStr("\tERDP   =0x");DebugU64(Controller->RuntimeRegs->Interrupter[0].ERDP.U);  DebugChar('\n');
     DebugStr("DoorbellRegs:\n");
-    DebugStr("\tDoorbellRegs=0x");DebugU32(Controller->DoorbellRegs->U);DebugChar('\n');
+    DebugStr("\tDoorbellRegs=0x");DebugU32(Controller->DoorbellRegs->rwDBStreamID);DebugChar('\n');
+}
+
+void PrintRegsAddr(xHCIController* Controller){
+    DebugStr("Regs Addr:\n");
+    DebugStr("\tvolatile xHCIRegsCapability*  CapabilityRegs =0x");DebugU64((u64)Controller->CapabilityRegs); DebugStr(";\n");
+    DebugStr("\tvolatile xHCIRegsOperational* OperationalRegs=0x");DebugU64((u64)Controller->OperationalRegs);DebugStr(";\n");
+    DebugStr("\tvolatile xHCIRegsRuntime*     RuntimeRegs    =0x");DebugU64((u64)Controller->RuntimeRegs);    DebugStr(";\n");
+    DebugStr("\tvolatile xHCIRegsDoorbell*    DoorbellRegs   =0x");DebugU64((u64)Controller->DoorbellRegs);   DebugStr(";\n");
+    DebugStr("CapabilityRegs:\n");
+    DebugStr("\tCAPLENGTH =0x");DebugU64((u64)&Controller->CapabilityRegs->CAPLENGTH-(u64)Controller->CapabilityRegs); DebugChar('\n');
+    DebugStr("\tHCIVERSION=0x");DebugU64((u64)&Controller->CapabilityRegs->HCIVERSION-(u64)Controller->CapabilityRegs);DebugChar('\n');
+    DebugStr("\tHCSPARAMS1=0x");DebugU64((u64)&Controller->CapabilityRegs->HCSPARAMS1-(u64)Controller->CapabilityRegs);DebugChar('\n');
+    DebugStr("\tHCSPARAMS2=0x");DebugU64((u64)&Controller->CapabilityRegs->HCSPARAMS2-(u64)Controller->CapabilityRegs);DebugChar('\n');
+    DebugStr("\tHCSPARAMS3=0x");DebugU64((u64)&Controller->CapabilityRegs->HCSPARAMS3-(u64)Controller->CapabilityRegs);DebugChar('\n');
+    DebugStr("\tHCCPARAMS1=0x");DebugU64((u64)&Controller->CapabilityRegs->HCCPARAMS1-(u64)Controller->CapabilityRegs);DebugChar('\n');
+    DebugStr("\tDBOFF     =0x");DebugU64((u64)&Controller->CapabilityRegs->DBOFF-(u64)Controller->CapabilityRegs);     DebugChar('\n');
+    DebugStr("\tRTSOFF    =0x");DebugU64((u64)&Controller->CapabilityRegs->RTSOFF-(u64)Controller->CapabilityRegs);    DebugChar('\n');
+    DebugStr("\tHCCPARAMS2=0x");DebugU64((u64)&Controller->CapabilityRegs->HCCPARAMS2-(u64)Controller->CapabilityRegs);DebugChar('\n');
+    DebugStr("OperationalRegs:\n");
+    DebugStr("\tUSBCMD  =0x");  DebugU64((u64)&Controller->OperationalRegs->USBCMD-(u64)Controller->OperationalRegs);  DebugChar('\n');
+    DebugStr("\tUSBSTS  =0x");  DebugU64((u64)&Controller->OperationalRegs->USBSTS-(u64)Controller->OperationalRegs);  DebugChar('\n');
+    DebugStr("\tPAGESIZE=0x");  DebugU64((u64)&Controller->OperationalRegs->PAGESIZE-(u64)Controller->OperationalRegs);DebugChar('\n');
+    DebugStr("\tDNCTRL  =0x");  DebugU64((u64)&Controller->OperationalRegs->DNCTRL-(u64)Controller->OperationalRegs);  DebugChar('\n');
+    DebugStr("\tCRCR    =0x");  DebugU64((u64)&Controller->OperationalRegs->CRCR-(u64)Controller->OperationalRegs);    DebugChar('\n');
+    DebugStr("\tDCBAAP  =0x");  DebugU64((u64)&Controller->OperationalRegs->DCBAAP-(u64)Controller->OperationalRegs);  DebugChar('\n');
+    DebugStr("\tCONFIG  =0x");  DebugU64((u64)&Controller->OperationalRegs->CONFIG-(u64)Controller->OperationalRegs);  DebugChar('\n');
+    DebugStr("\tPORTS   =0x");  DebugU64((u64)&Controller->OperationalRegs->PORTS-(u64)Controller->OperationalRegs);   DebugStr("{\n");
+    for (u32 Idx=0;Idx<Controller->CapabilityRegs->HCSPARAMS1.roNumberOfPorts;Idx++){
+        DebugStr("\t\t");DebugU64((u64)&Controller->OperationalRegs->PORTS[Idx]-(u64)Controller->OperationalRegs);                                    DebugStr("{\n");
+        DebugStr("\t\t\tPORTSC   =0x");DebugU64((u64)&Controller->OperationalRegs->PORTS[Idx].PORTSC-(u64)&Controller->OperationalRegs->PORTS[Idx]);   DebugChar('\n');
+        DebugStr("\t\t\tPORTPMSC =0x");DebugU64((u64)&Controller->OperationalRegs->PORTS[Idx].PORTPMSC-(u64)&Controller->OperationalRegs->PORTS[Idx]); DebugChar('\n');
+        DebugStr("\t\t\tPORTLI   =0x");DebugU64((u64)&Controller->OperationalRegs->PORTS[Idx].PORTLI-(u64)&Controller->OperationalRegs->PORTS[Idx]);   DebugChar('\n');
+        DebugStr("\t\t\tPORTHLPMC=0x");DebugU64((u64)&Controller->OperationalRegs->PORTS[Idx].PORTHLPMC-(u64)&Controller->OperationalRegs->PORTS[Idx]);DebugChar('\n');
+        if (Idx!=(Controller->CapabilityRegs->HCSPARAMS1.roNumberOfPorts-1)) DebugStr("\t\t},\n");
+        else DebugStr("\t\t}\n");
+    }
+    DebugStr("\t}\n");
+    DebugStr("RuntimeRegs:\n");
+    DebugStr("\tMFINDEX=0x");DebugU64((u64)&Controller->RuntimeRegs->MFINDEX-(u64)Controller->RuntimeRegs);              DebugChar('\n');
+    DebugStr("\tIMAN   =0x");DebugU64((u64)&Controller->RuntimeRegs->Interrupter[0].IMAN-(u64)Controller->RuntimeRegs);  DebugChar('\n');
+    DebugStr("\tIMOD   =0x");DebugU64((u64)&Controller->RuntimeRegs->Interrupter[0].IMOD-(u64)Controller->RuntimeRegs);  DebugChar('\n');
+    DebugStr("\tERSTSZ =0x");DebugU64((u64)&Controller->RuntimeRegs->Interrupter[0].ERSTSZ-(u64)Controller->RuntimeRegs);DebugChar('\n');
+    DebugStr("\tERSTBA =0x");DebugU64((u64)&Controller->RuntimeRegs->Interrupter[0].ERSTBA-(u64)Controller->RuntimeRegs);DebugChar('\n');
+    DebugStr("\tERDP   =0x");DebugU64((u64)&Controller->RuntimeRegs->Interrupter[0].ERDP-(u64)Controller->RuntimeRegs);  DebugChar('\n');
 }
 
 void XHCIFuncInt(){
+    DebugStr("Entry XHCIFuncInt\n");
+    xHCIController* Ctrl=GlobalXHCI;
+    if (!Ctrl->RuntimeRegs->Interrupter->IMAN.rw1cInterruptPending) {
+        return;
+    }
+    Ctrl->RuntimeRegs->Interrupter[0].IMAN.rw1cInterruptPending=1;
     LocalApicEOI();
 }
 
@@ -83,6 +133,14 @@ __attribute__((naked)) void XHCIInt(){
     );
 }
 
+void SendCommandRing(xHCIController* Ctrl, xHCITransferRequestBlock TRB, u64 Idx){
+    Ctrl->CommandRingTRBs[Idx].NormalTRBField0.U = TRB.NormalTRBField0.U;
+    Ctrl->CommandRingTRBs[Idx].NormalTRBField1.U = TRB.NormalTRBField1.U;
+    Ctrl->CommandRingTRBs[Idx].NormalTRBField2.U = TRB.NormalTRBField2.U;
+
+    Ctrl->DoorbellRegs[0].U = (u32)Idx;
+}
+
 xHCIController* InitXHCI() {
     u8 Bus, Dev, Func;
     PCIFindDeviceByClass(0x0C, 0x03, 0x30, &Bus, &Dev, &Func);
@@ -94,13 +152,13 @@ xHCIController* InitXHCI() {
     xHCIController* Ctrl = AlignedAlloc(&KernelPool, sizeof(xHCIController), 64);
     Ctrl->CapabilityRegs  = (xHCIRegsCapability*)Base;
     Ctrl->OperationalRegs = (xHCIRegsOperational*)(Base + Ctrl->CapabilityRegs->CAPLENGTH);
-    Ctrl->RuntimeRegs     = (xHCIRegsRuntime*)(Base + Ctrl->CapabilityRegs->RTSOFF.roRuntimeRegisterSpaceOffset);
-    Ctrl->DoorbellRegs    = (xHCIRegsDoorbell*)(Base + Ctrl->CapabilityRegs->DBOFF.roDoorbellArrayOffset);
+    Ctrl->RuntimeRegs     = (xHCIRegsRuntime*)(Base + Ctrl->CapabilityRegs->RTSOFF.U);
+    Ctrl->DoorbellRegs    = (xHCIRegsDoorbell*)(Base + Ctrl->CapabilityRegs->DBOFF.U);
 
     while (Ctrl->OperationalRegs->USBSTS.roControllerNotReady) __asm__("pause");
 
     DebugStr("ControllerReady:\n");
-    PrintRegsAddr(Ctrl);
+    PrintRegsValue(Ctrl);
 
     Ctrl->OperationalRegs->USBCMD.rwRunStop = 0;
     Ctrl->OperationalRegs->USBCMD.rwHostControllerReset = 1;
@@ -113,55 +171,6 @@ xHCIController* InitXHCI() {
     Ctrl->OperationalRegs->CONFIG.rwU3EntryEnable=0;
     Ctrl->OperationalRegs->CONFIG.rwConfigurationInformationEnable=0;
     Ctrl->OperationalRegs->CONFIG.U=0x00000000|Ctrl->CapabilityRegs->HCSPARAMS1.roNumberOfDeviceSlots;
-
-    DebugStr("CONFIG addr: 0x");
-    DebugU64((u64)&Ctrl->OperationalRegs->CONFIG);
-    DebugStr("\n");
-    DebugStr("Expected:    0x");
-    DebugU64(Base + Ctrl->CapabilityRegs->CAPLENGTH + 0x38);
-    DebugStr("\n");
-
-    DebugStr("DCBAAP addr: 0x");
-    DebugU64((u64)&Ctrl->OperationalRegs->DCBAAP);
-    DebugStr("\n");
-    DebugStr("Expected:    0x");
-    DebugU64(Base + Ctrl->CapabilityRegs->CAPLENGTH + 0x30);
-    DebugStr("\n");
-
-    DebugStr("IMAN addr:   0x");
-    DebugU64((u64)&Ctrl->RuntimeRegs->Interrupter[0].IMAN);
-    DebugStr("\n");
-    DebugStr("Expected:    0x");
-    DebugU64(Base + Ctrl->CapabilityRegs->RTSOFF.roRuntimeRegisterSpaceOffset + 0x20);
-    DebugStr("\n");
-
-    DebugStr("IMON addr:   0x");
-    DebugU64((u64)&Ctrl->RuntimeRegs->Interrupter[0].IMOD);
-    DebugStr("\n");
-    DebugStr("Expected:    0x");
-    DebugU64(Base + Ctrl->CapabilityRegs->RTSOFF.roRuntimeRegisterSpaceOffset + 0x24);
-    DebugStr("\n");
-
-    DebugStr("ERSTSZ addr: 0x");
-    DebugU64((u64)&Ctrl->RuntimeRegs->Interrupter[0].ERSTSZ);
-    DebugStr("\n");
-    DebugStr("Expected:    0x");
-    DebugU64(Base + Ctrl->CapabilityRegs->RTSOFF.roRuntimeRegisterSpaceOffset + 0x28);
-    DebugStr("\n");
-
-    DebugStr("ERSTBA addr: 0x");
-    DebugU64((u64)&Ctrl->RuntimeRegs->Interrupter[0].ERSTBA);
-    DebugStr("\n");
-    DebugStr("Expected:    0x");
-    DebugU64(Base + Ctrl->CapabilityRegs->RTSOFF.roRuntimeRegisterSpaceOffset + 0x30);
-    DebugStr("\n");
-
-    DebugStr("ERDP addr:   0x");
-    DebugU64((u64)&Ctrl->RuntimeRegs->Interrupter[0].ERDP);
-    DebugStr("\n");
-    DebugStr("Expected:    0x");
-    DebugU64(Base + Ctrl->CapabilityRegs->RTSOFF.roRuntimeRegisterSpaceOffset + 0x38);
-    DebugStr("\n");
 
     while (!Ctrl->OperationalRegs->USBSTS.roHCHalted) {
         __asm__("pause");
@@ -222,10 +231,31 @@ xHCIController* InitXHCI() {
     __asm__ volatile("mfence" ::: "memory");
 
     DebugStr("Set All Regs:\n");
+    PrintRegsValue(Ctrl);
     PrintRegsAddr(Ctrl);
 
     Ctrl->OperationalRegs->USBCMD.rwRunStop = 1;
     while (Ctrl->OperationalRegs->USBSTS.roHCHalted) __asm__("pause");
+
+    DebugStr("Run xHCI!!!!!\n");
+
+    for (u64 Idx = 0; Idx < Ctrl->CapabilityRegs->HCSPARAMS1.roNumberOfPorts; Idx++) {
+        if (Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rosCurrentConnectStatus == 0) continue; 
+
+        Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1csConnectStatusChange = 1;
+        Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1sPortReset = 1;
+        
+        while (Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1sPortReset) __asm__("pause");
+        while (!Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1csPortResetChange) __asm__("pause");
+        
+        Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1csPortResetChange = 1;
+    }
+    Ctrl->OperationalRegs->USBCMD.rwInterrupterEnable=1;
+    Ctrl->RuntimeRegs->Interrupter[0].IMAN.rwInterruptEnable=1;
+    xHCITransferRequestBlock TRBs={{.U=0},{.U=0},{.CycleBit=1,.TRBType=9}};
+    SendCommandRing(Ctrl,TRBs,0);
+
+    PrintRegsValue(Ctrl);
 
     DebugStr("xHCI Started Successfully!\n");
     return Ctrl;

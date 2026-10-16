@@ -204,10 +204,12 @@ void GlobalNotepadPoll(void* Self) {
     u32 WinY = (u32)WinSelf->Base.y;
     u32 WinW = (u32)WinSelf->Base.w;
     u32 TitleBarHeight = 20;
-
+    
     Bool InTitleBar = (
-        MouseX >= WinX && MouseX <= WinX + WinW &&
-        MouseY >= WinY && MouseY <= WinY + TitleBarHeight
+        MouseX >= WinX && MouseX < WinX + WinW &&
+        MouseY >= WinY && MouseY < WinY + TitleBarHeight &&
+        ((KernelGlobalWindowManager.Tail == WinSelf) ||
+        (WMWindowsTitleOverlapping(&KernelGlobalWindowManager, WinSelf, TitleBarHeight, MouseX-WinX, MouseY-WinY) == NULL))
     );
 
     if (GlobalPS2Mouse.Code.ButtonLeft && InTitleBar && !WinSelf->IsDragging) {

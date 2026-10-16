@@ -2,90 +2,13 @@
 
 #include "int.h"
 
-#define TRB_TYPE_NORMAL              1
-#define TRB_TYPE_SETUP_STAGE         2
-#define TRB_TYPE_DATA_STAGE          3
-#define TRB_TYPE_STATUS_STAGE        4
-#define TRB_TYPE_ISOCH               5
-#define TRB_TYPE_LINK                6
-#define TRB_TYPE_EVENT_DATA          7
-#define TRB_TYPE_NO_OP               8
-
-#define CMD_ENABLE_SLOT              1
-#define CMD_DISABLE_SLOT             2
-#define CMD_ADDRESS_DEVICE           11
-#define CMD_CONFIGURE_ENDPOINT       12
-#define CMD_EVALUATE_CONTEXT         13
-#define CMD_RESET_ENDPOINT           14
-#define CMD_STOP_ENDPOINT            15
-#define CMD_SET_TR_DEQUEUE           16
-#define CMD_RESET_DEVICE             17
-#define CMD_FORCE_EVENT              18
-#define CMD_NEGOTIATE_BANDWIDTH      19
-#define CMD_SET_LATENCY_TOLERANCE    20
-#define CMD_GET_PORT_BANDWIDTH       21
-#define CMD_FORCE_HEADER             22
-
-#define CC_SUCCESS                   1
-#define CC_DATA_BUFFER_ERROR         2
-#define CC_BABBLE_DETECTED           3
-#define CC_TRB_ERROR                 4
-#define CC_STALL                     5
-#define CC_RESOURCE_ERROR            6
-#define CC_BANDWIDTH_ERROR           7
-#define CC_NO_SLOTS_AVAILABLE        8
-#define CC_INVALID_STREAM_TYPE       9
-#define CC_SLOT_NOT_ENABLED          10
-#define CC_EP_NOT_ENABLED            11
-#define CC_SHORT_PACKET              12
-#define CC_RING_UNDERRUN             13
-#define CC_RING_OVERRUN              14
-#define CC_VF_EVENT_RING_FULL        15
-#define CC_PARAMETER_ERROR           16
-#define CC_BANDWIDTH_OVERRUN         17
-#define CC_CONTEXT_STATE_ERROR       18
-#define CC_NO_PING_RESPONSE          19
-#define CC_EVENT_RING_FULL           20
-#define CC_INCOMPATIBLE_DEVICE       21
-#define CC_MISSED_SERVICE            22
-#define CC_COMMAND_RING_STOPPED      23
-#define CC_COMMAND_ABORTED           24
-#define CC_STOPPED                  25
-#define CC_STOPPED_LENGTH_INVALID   26
-#define CC_MAX_EXIT_LATENCY_TOO_LARGE 27
-#define CC_ISOCH_BUFFER_OVERRUN      28
-#define CC_EVENT_LOST                29
-#define CC_UNDEFINED_ERROR           30
-#define CC_INVALID_STREAM_ID         31
-#define CC_SECONDARY_BANDWIDTH_ERROR 32
-#define CC_SPLIT_TRANSACTION_ERROR   33
-
-#define USB_REQ_GET_STATUS           0x00
-#define USB_REQ_CLEAR_FEATURE        0x01
-#define USB_REQ_SET_FEATURE          0x03
-#define USB_REQ_SET_ADDRESS          0x05
-#define USB_REQ_GET_DESCRIPTOR       0x06
-#define USB_REQ_SET_DESCRIPTOR       0x07
-#define USB_REQ_GET_CONFIGURATION    0x08
-#define USB_REQ_SET_CONFIGURATION    0x09
-#define USB_REQ_GET_INTERFACE        0x0A
-#define USB_REQ_SET_INTERFACE        0x0B
-#define USB_REQ_SYNCH_FRAME          0x0C
-
-#define DESC_TYPE_DEVICE             1
-#define DESC_TYPE_CONFIGURATION      2
-#define DESC_TYPE_STRING             3
-#define DESC_TYPE_INTERFACE          4
-#define DESC_TYPE_ENDPOINT           5
-#define DESC_TYPE_DEVICE_QUALIFIER   6
-#define DESC_TYPE_OTHER_SPEED        7
-#define DESC_TYPE_INTERFACE_POWER    8
-
-#define USB_SPEED_FULL               0
-#define USB_SPEED_LOW                1
-#define USB_SPEED_HIGH               2
-#define USB_SPEED_SUPER              3
-#define USB_SPEED_SUPER_PLUS         4
+typedef enum {
+    USB_SPEED_FULL,
+    USB_SPEED_LOW,
+    USB_SPEED_HIGH,
+    USB_SPEED_SUPER,
+    USB_SPEED_SUPER_PLUS,
+} USBSpeed;
 
 typedef volatile enum {
     PORT_STATE_DISABLED,
@@ -318,7 +241,7 @@ typedef struct {
             volatile u32 RsvdZ0                 : 2;
             volatile u32 BlockEventInterrupt    : 1;
             volatile u32 TRBType                : 6;
-            volatile u32 RsvdZ1                 : 15;
+            volatile u32 RsvdZ1                 : 16;
         };
     };
 } __attribute__((packed)) xHCIRegNormalTRBField2;
@@ -868,7 +791,7 @@ typedef volatile struct {
     volatile xHCIRegsIMAN   IMAN;
     volatile xHCIRegsIMOD   IMOD;
     volatile xHCIRegsERSTSZ ERSTSZ;
-    volatile u32            rwRsvdP;
+    volatile u32            rwRsvdP1;
     volatile xHCIRegsERSTBA ERSTBA;
     volatile xHCIRegsERDP   ERDP;
 } __attribute__((packed)) xHCIInterrupterRegs;
@@ -896,10 +819,6 @@ typedef struct {
     volatile xHCIRegsOperational* OperationalRegs;
     volatile xHCIRegsRuntime*     RuntimeRegs;
     volatile xHCIRegsDoorbell*    DoorbellRegs;
-
-    u32 MaxSlots;
-    u32 MaxPorts;
-    u32 MaxInterrupters;
     
     __attribute__((aligned(64))) xHCITransferRequestBlock       EventRingTRBs[256];
     __attribute__((aligned(64))) xHCIEventRingSegmentTableEntry ERST[1];
@@ -911,11 +830,9 @@ typedef struct {
     u32 EventRingCycleState;
     u32 CommandRingCycleState;
     
-    u8 IsRunning;
-    u8 IsMSIEnabled;
-    
     u32 UsedSlots;
     u32 LastSlotID;
+    u32 CommandRingEnqueueIdx;
 
     u32 PendingCommandType;
     u8  CommandPending;

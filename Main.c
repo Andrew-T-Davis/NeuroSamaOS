@@ -112,7 +112,7 @@ u64* BuildDynamicPageTable(
 ) {
     DebugStr("PhysMem:");DebugU64(PhysMem);DebugChar('\n');
     EFI_PHYSICAL_ADDRESS alloc_addr;
-    int use_l5 = IsLa57Supported();
+    int Use_l5 = IsLa57Supported();
 
     alloc_addr = 0xFFFFFFFFFFFFFFFF;
     if (bs->AllocatePages(AllocateMaxAddress, EfiRuntimeServicesData, 1, &alloc_addr) != EFI_SUCCESS) return 0;
@@ -120,7 +120,7 @@ u64* BuildDynamicPageTable(
     MemSet(root_table, 0, 4096);
 
     u64* pml4 = NULL;
-    if (use_l5) {
+    if (Use_l5) {
         alloc_addr = 0xFFFFFFFFFFFFFFFF;
         if (bs->AllocatePages(AllocateMaxAddress, EfiRuntimeServicesData, 1, &alloc_addr) != EFI_SUCCESS) return 0;
         pml4 = (u64*)alloc_addr;
@@ -185,7 +185,7 @@ u64* BuildDynamicPageTable(
         : "rcx"
     );
 
-    u64 max_1gb_pages_limit = use_l5 ? 262144 : 512;
+    u64 max_1gb_pages_limit = Use_l5 ? 262144 : 512;
     max_1gb_pages = (result_low > max_1gb_pages_limit) ? max_1gb_pages_limit : result_low;
 
     u64 code_start_1gb = (CodeStart / 0x40000000) * 0x40000000;
@@ -198,11 +198,11 @@ u64* BuildDynamicPageTable(
         u64 pml4_idx = (phys % (1ULL << 48)) / (1ULL << 39);
         u64 pdpt_idx = (phys % (1ULL << 39)) / 0x40000000ULL;
 
-        if (!use_l5 && phys >= (1ULL << 48)) break;
+        if (!Use_l5 && phys >= (1ULL << 48)) break;
         if (pml5_idx >= 512) break;
 
         u64* active_pml4 = pml4;
-        if (use_l5) {
+        if (Use_l5) {
             if (root_table[pml5_idx] == 0) {
                 alloc_addr = 0xFFFFFFFFFFFFFFFF;
                 if (bs->AllocatePages(AllocateMaxAddress, EfiRuntimeServicesData, 1, &alloc_addr) != EFI_SUCCESS) return 0;
@@ -1152,19 +1152,19 @@ void SendSIPI(u64 ApicId, u64 TrampolineVector) {
         
         while (*IcrLow & (1 << 12)) __asm__("pause" : : : "memory");
         *IcrHigh = (u32)((ApicId & 0xFF) << 24);
-        __asm__ __volatile__("" ::: "memory");
+        __asm__ volatile("" ::: "memory");
         *IcrLow  = 0x00004500;
         SystemBusySleepMs(10);
         
         while (*IcrLow & (1 << 12)) __asm__("pause" : : : "memory");
         *IcrHigh = (u32)((ApicId & 0xFF) << 24);
-        __asm__ __volatile__("" ::: "memory");
+        __asm__ volatile("" ::: "memory");
         *IcrLow  = 0x00004600 | Vector;
         SystemBusySleepUs(200);
 
         while (*IcrLow & (1 << 12)) __asm__("pause" : : : "memory");
         *IcrHigh = (u32)((ApicId & 0xFF) << 24);
-        __asm__ __volatile__("" ::: "memory");
+        __asm__ volatile("" ::: "memory");
         *IcrLow  = 0x00004600 | Vector;
         SystemBusySleepUs(200);
     }
@@ -1686,6 +1686,5 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
         Get = 0;
         Get0xE0Down = 0;
         TopF1To12Key = 0;
-        MemFlash();
     }
 }

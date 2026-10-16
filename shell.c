@@ -14,6 +14,7 @@
 #include "RandomSomething.h"
 #include "Notepad.h"
 #include "kmalloc.h"
+#include "SystemInfo.h"
 
 #define SHELL_COLS 79
 #define SHELL_ROWS 20
@@ -282,6 +283,9 @@ void ProcessCommand(TextBox* TextSelf, LineShell* Line, Window* WinSelf) {
     else if (StrIsWithSize(Cmd, "Shell", 6)){
         NewShellWindow();
     }
+    else if (StrIsWithSize(Cmd, "SystemInfo", 11)){
+        NewSystemInfoWindow();
+    }
     else if (StrIsWithSize(Cmd, "Exit", 5)) {
         ShellPrint(TextSelf, "73\n");
         WinSelf->Base.Exit(WinSelf);
@@ -353,8 +357,10 @@ void GlobalShellPoll(void* Self) {
     u32 TitleBarHeight = 20;
 
     Bool InTitleBar = (
-        MouseX >= WinX && MouseX <= WinX + WinW &&
-        MouseY >= WinY && MouseY <= WinY + TitleBarHeight
+        MouseX >= WinX && MouseX < WinX + WinW &&
+        MouseY >= WinY && MouseY < WinY + TitleBarHeight &&
+        ((KernelGlobalWindowManager.Tail == WinSelf) ||
+        (WMWindowsTitleOverlapping(&KernelGlobalWindowManager, WinSelf, TitleBarHeight, MouseX-WinX, MouseY-WinY) == NULL))
     );
 
     if (GlobalPS2Mouse.Code.ButtonLeft && InTitleBar && !WinSelf->IsDragging) {

@@ -15,13 +15,13 @@ f64 DeltaMs=0.0;
 
 u64 rdtsc(void) {
     u32 low, high;
-    __asm__ __volatile__("rdtsc" : "=a"(low), "=d"(high));
+    __asm__ volatile("rdtsc" : "=a"(low), "=d"(high));
     return ((u64)high << 32) | low;
 }
 
 u64 rdtscp(void) {
     u32 low, high, aux;
-    __asm__ __volatile__("rdtscp" : "=a"(low), "=d"(high), "=c"(aux));
+    __asm__ volatile("rdtscp" : "=a"(low), "=d"(high), "=c"(aux));
     return ((u64)high << 32) | low;
 }
 
@@ -39,7 +39,7 @@ void wrmsr(u32 msr, u64 value) {
 
 u64 rdtsc_serialized(void) {
     u32 low, high;
-    __asm__ __volatile__(
+    __asm__ volatile(
         "lfence\n\t"
         "rdtsc\n\t"
         : "=a"(low), "=d"(high)
