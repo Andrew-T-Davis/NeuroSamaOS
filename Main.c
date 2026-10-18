@@ -1,3 +1,4 @@
+#include "FreedomDiskFourDimensions.h"
 #include "RandomSomething.h"
 #include "ahci.h"
 #include "efi.h"
@@ -1605,6 +1606,11 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
 
     InitAudioBuff();
 
+    __asm__ volatile("sti");
+    u64 rflags;
+    __asm__ volatile("pushfq; pop %0" : "=r"(rflags));
+    DebugStr("After sti: IF = "); DebugU32((rflags >> 9) & 1); DebugChar('\n');
+
     xHCIController* KernelXHCI=InitXHCI();
     DebugStr("KernelXHCI At=");DebugU64((u64)KernelXHCI);DebugChar('\n');
 
@@ -1649,7 +1655,101 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     DebugStr("TestStructObj->A[512] Base==0x");DebugU64((u64)&TestStructObj->A[512]);DebugChar('\n');
     DebugStr("TestStructObj->B[1][0] Base==0x");DebugU64((u64)&TestStructObj->B[1][0]);DebugChar('\n');
     Free(&KernelPool, TestStructObj);
-    
+
+    InitDiskToFDFD(1);
+
+    xHCITransferRequestBlock TRBs={{.U=0},{.U=0},{.CycleBit=1,.TRBType=9}};
+    SendCommandRing(KernelXHCI,TRBs);
+
+    PrintRegsValue(KernelXHCI);
+
+    DebugStr("=== ICR test ===\n");
+    volatile u32* IcrLow  = (volatile u32*)0xFEE00300;
+    volatile u32* IcrHigh = (volatile u32*)0xFEE00310;
+    while (*IcrLow & (1 << 12)) __asm__("pause");
+    *IcrHigh = 0;
+    *IcrLow  = 0x00004000 | 0xED;
+    DebugStr("=== ICR sent ===\n");
+
+    KernelXHCI->CommandRingCount=0;
+
+    xHCITransferRequestBlock EnableSlotTRB = {0};
+    EnableSlotTRB.NormalTRBField2.TRBType = 9;
+    SendCommandRing(KernelXHCI, EnableSlotTRB);
+
+    for (volatile u64 i = 0; i < 10000000; i++) __asm__("pause");
+
+    DebugStr("After EnableSlot: CommandRingCount = "); DebugU32(KernelXHCI->CommandRingCount); DebugChar('\n');
+    DebugStr("After EnableSlot: IMAN = 0x"); DebugU32(KernelXHCI->RuntimeRegs->Interrupter[0].IMAN.U); DebugChar('\n');
+    DebugStr("After EnableSlot: ERDP = 0x"); DebugU64(KernelXHCI->RuntimeRegs->Interrupter[0].ERDP.U); DebugChar('\n');
+
+    xHCIInputContext* InputCtx = (xHCIInputContext*)AlignedAlloc(&KernelPool, sizeof(xHCIInputContext), 64);
+    MemSet((u8*)InputCtx, 0, sizeof(xHCIInputContext));
+
+    xHCITransferRequestBlock* EP0Ring = (xHCITransferRequestBlock*)AlignedAlloc(&KernelPool, 64 * sizeof(xHCITransferRequestBlock), 64);
+    MemSet((u8*)EP0Ring, 0, 64 * sizeof(xHCITransferRequestBlock));
+
+    InputCtx->InputControl.Field0.U = 0;
+    InputCtx->InputControl.Field1.U = (1U << 0) | (1U << 1);
+    InputCtx->InputControl.Field2.U = 0;
+
+    u32 portNum = 5;
+    InputCtx->SlotContext.SlotField0.RouteString = 0;
+    InputCtx->SlotContext.SlotField0.Speed = KernelXHCI->OperationalRegs->PORTS[portNum-1].PORTSC.rosPortSpeed;
+    InputCtx->SlotContext.SlotField0.MultiTT = 0;
+    InputCtx->SlotContext.SlotField0.Hub = 0;
+    InputCtx->SlotContext.SlotField0.ContextEntries = 1;
+
+    InputCtx->SlotContext.SlotField1.MaxExitLatency = 0;
+    InputCtx->SlotContext.SlotField1.RootHubPortNumber = portNum;
+    InputCtx->SlotContext.SlotField1.NumberOfPorts = 0;
+
+    InputCtx->SlotContext.SlotField2.ParentHubSlotID = 0;
+    InputCtx->SlotContext.SlotField2.ParentPortNumber = 0;
+    InputCtx->SlotContext.SlotField2.TThinkTime = 0;
+    InputCtx->SlotContext.SlotField2.InterrupterTarget = 0;
+
+    InputCtx->SlotContext.SlotField3.USBDeviceAddress = 0;
+    InputCtx->SlotContext.SlotField3.SlotState = 0;
+
+    InputCtx->EndpointContext[0].Field0.EndPointState = 0;
+    InputCtx->EndpointContext[0].Field0.Mult = 0;
+    InputCtx->EndpointContext[0].Field0.MaxPrimaryStreams = 0;
+    InputCtx->EndpointContext[0].Field0.LinearStreamArray = 0;
+    InputCtx->EndpointContext[0].Field0.Interval = 0;
+    InputCtx->EndpointContext[0].Field0.MaxEndPointServiceTimeIntervalPayloadHigh = 0;
+
+    InputCtx->EndpointContext[0].Field1.ErrorCount = 3;
+    InputCtx->EndpointContext[0].Field1.EndPointType = 4;
+    InputCtx->EndpointContext[0].Field1.HostInititeDisable = 0;
+    InputCtx->EndpointContext[0].Field1.MaxBurstSize = 0;
+    InputCtx->EndpointContext[0].Field1.MaxPacketSize = 8;
+
+    InputCtx->EndpointContext[0].Field2.U = ((u64)EP0Ring & ~0xFULL) | 1;
+
+    InputCtx->EndpointContext[0].Field3.AverageTRBLength = 8;
+    InputCtx->EndpointContext[0].Field3.MaxEndpointServiceTimeIntervalPayloadLow = 0;
+
+    xHCITransferRequestBlock AddrDevTRB = {0};
+    AddrDevTRB.NormalTRBField0.Base = (u64)InputCtx;
+    AddrDevTRB.NormalTRBField1.U = ((u32)1 << 24);
+    AddrDevTRB.NormalTRBField2.TRBType = 11;
+
+    SendCommandRing(KernelXHCI, AddrDevTRB);
+
+    for (volatile u64 i = 0; i < 10000000; i++) __asm__("pause");
+
+    DebugStr("After AddrDev: CommandRingCount = "); DebugU32(KernelXHCI->CommandRingCount); DebugChar('\n');
+    DebugStr("After AddrDev: IMAN = 0x"); DebugU32(KernelXHCI->RuntimeRegs->Interrupter[0].IMAN.U); DebugChar('\n');
+    DebugStr("After AddrDev: ERDP = 0x"); DebugU64(KernelXHCI->RuntimeRegs->Interrupter[0].ERDP.U); DebugChar('\n');
+    DebugStr("After AddrDev: USBSTS = 0x"); DebugU32(KernelXHCI->OperationalRegs->USBSTS.U); DebugChar('\n');
+
+    IcrLow  = (volatile u32*)0xFEE00300;
+    IcrHigh = (volatile u32*)0xFEE00310;
+    while (*IcrLow & (1 << 12)) __asm__("pause");
+    *IcrHigh = 0;
+    *IcrLow  = 0x00004000 | 0xED;
+
     u64 LastFrameTime = SystemGetTimeNano();
     while (1){
         WaitForEvent();

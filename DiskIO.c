@@ -51,3 +51,21 @@ u8* ReadDisk(AHCIController* Ctrl, u8 Idx, Size64 Size, u64 OffSet) {
 
     return buffer;
 }
+
+void ReadDiskToBuffer(AHCIController* Ctrl, u8 Idx, Size64 Size, u64 OffSet, void* Buffer) {
+    if (!Ctrl || !Size || Size == 0) return;
+
+    u64 lba = OffSet;
+    u16 count = (u16)(Size);
+    Size64 byte_size = (Size64)count * 512;
+    u8* buffer=Buffer;
+    MemSet(buffer, 0, byte_size);
+
+    u8 slot = Ctrl->PortFISSlot[Idx] % 32;
+
+    if (AHCISendMessage(Ctrl, Idx, slot, lba, count, buffer, 0) == -1) {
+        DebugStr("[AHCI Read] Read operation failed on Port ");
+        DebugU8(Idx);
+        DebugChar('\n');
+    }
+}

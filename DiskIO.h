@@ -4,3 +4,4 @@
 
 Bool WriteDisk(AHCIController* Ctrl, u8 Idx, void* Buffer, Size64 Size, u64 OffSet);
 u8* ReadDisk(AHCIController* Ctrl, u8 Idx, Size64 Size, u64 OffSet);
+void ReadDiskToBuffer(AHCIController* Ctrl, u8 Idx, Size64 Size, u64 OffSet, void* Buffer);

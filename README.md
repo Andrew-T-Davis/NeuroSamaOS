@@ -93,13 +93,6 @@ MIT – Use it, break it, fix it, fork it.
 
 --
 
-# My resentment
-
-Fuck COPPA, Fuck GitHub, Fuck Git, Fuck GitLab, Fuck Gitee, Fuck My Life
-I Got Ban In GitHub Because Im 12yo, Fuck COPPA
-
---- 
-
 # PS
 
 (I didn't browse the OSDev Wiki or any Linux source code at all during development. Btw)

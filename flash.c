@@ -13,5 +13,7 @@ void LoadFlash(void) {
 }
 
 void MemFullFlash(void) {
+    __asm__ volatile("sfence" ::: "memory");
+    __asm__ volatile("lfence" ::: "memory");
     __asm__ volatile("mfence" ::: "memory");
 }

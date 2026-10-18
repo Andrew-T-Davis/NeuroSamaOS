@@ -14,7 +14,6 @@ typedef struct {
     u16 Sign0xFDFD;
     Size64 CountOfSector;
     Size64 SizeOfData;
-    Size64 SizeOfName;
     union {
         u8 Data[];
         u8 DataSector[][512];
@@ -47,3 +46,4 @@ u8* GetFDFDFolderTableBuffer(FDFDFolderTable* Data, u8 Idx);
 u8* GetFDFDFileTableBuffer(FDFDFileTable* Data, u8 Idx);
 void NewFile(FDFDFileTable Table, u8 Idx, u8* Data);
 void NewFolder(FDFDFolderTable Table, u8 Idx, u8* Data);
+void InitDiskToFDFD(u8 Idx);

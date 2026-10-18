@@ -546,7 +546,10 @@ AHCIController* InitAHCI() {
 }
 
 int AHCISendMessage(AHCIController* controller, u8 port_idx, u8 slot, u64 lba, u16 count, void* buffer, u8 is_write) {
-    if (!controller || !controller->Regs || port_idx >= 32) return -1;
+    if (!controller || !controller->Regs || port_idx >= 32) {
+        DebugStr("[AHCI Error] (!controller || !controller->Regs || port_idx >= 32)==1\n");
+        return -1;
+    }
 
     volatile AHCIPortRegister* port = &controller->Regs->PortRegisters[port_idx];
 
@@ -611,6 +614,7 @@ int AHCISendMessage(AHCIController* controller, u8 port_idx, u8 slot, u64 lba, u
         }
 
         if (port->PortInterruptStatus.rwcTaskFileErrorStatus) {
+            DebugStr("port->PortInterruptStatus.rwcTaskFileErrorStatus == 1\n");
             return -1;
         }
     }

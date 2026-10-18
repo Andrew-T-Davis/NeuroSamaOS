@@ -1,11 +1,20 @@
 #include "xhci.h"
+#include "event.h"
 #include "flash.h"
 #include "int.h"
 #include "pci.h"
 #include "kmalloc.h"
 #include "debug.h"
 #include "ioapic.h"
+#include "port.h"
 #include "str.h"
+
+#define DUMP_STS(tag) do { \
+    DebugStr(tag); \
+    DebugStr(" USBSTS = 0x"); \
+    DebugU32(Ctrl->OperationalRegs->USBSTS.U); \
+    DebugChar('\n'); \
+} while(0)
 
 extern AllocPool KernelPool;
 
@@ -109,12 +118,51 @@ void PrintRegsAddr(xHCIController* Controller){
 }
 
 void XHCIFuncInt(){
+    outb(0x3F8, 'X');
     DebugStr("Entry XHCIFuncInt\n");
-    xHCIController* Ctrl=GlobalXHCI;
-    if (!Ctrl->RuntimeRegs->Interrupter->IMAN.rw1cInterruptPending) {
+    MakeEvent();
+    xHCIController* Ctrl = GlobalXHCI;
+    if (!Ctrl) {
+        LocalApicEOI();
         return;
     }
-    Ctrl->RuntimeRegs->Interrupter[0].IMAN.rw1cInterruptPending=1;
+    if (!Ctrl->RuntimeRegs->Interrupter[0].IMAN.rw1cInterruptPending) {
+        DebugStr("!Ctrl->RuntimeRegs->Interrupter[0].IMAN.rw1cInterruptPending==1\n");
+        LocalApicEOI();
+        return;
+    }
+    PrintRegsValue(Ctrl);
+    Ctrl->RuntimeRegs->Interrupter[0].IMAN.rw1cInterruptPending = 1;
+
+    DebugStr("XHCIFuncInt entry, DequeueIdx="); DebugU32(Ctrl->EventRingDequeueIdx); DebugChar('\n');
+
+    while (1) {
+        volatile xHCITransferRequestBlock* ev = &Ctrl->EventRingTRBs[Ctrl->EventRingDequeueIdx];
+
+        if (ev->NormalTRBField2.CycleBit != Ctrl->EventRingCycleState) break;
+
+        u32 type = ev->NormalTRBField2.TRBType;
+        DebugStr("  Event type="); DebugU32(type); DebugChar('\n');
+
+        if (type == 33) {
+            u32 completionCode = (ev->NormalTRBField1.U >> 24) & 0xFF;
+            u32 slotID = (ev->NormalTRBField2.U >> 24) & 0xFF;
+            
+            DebugStr("  CmdCompletion: Code="); DebugU32(completionCode); DebugStr(" SlotID="); DebugU32(slotID); DebugChar('\n');
+            
+            if (Ctrl->CommandRingCount > 0) Ctrl->CommandRingCount--;
+        }
+        Ctrl->EventRingDequeueIdx = (Ctrl->EventRingDequeueIdx + 1) % 256;
+        if (Ctrl->EventRingDequeueIdx == 0) {
+            Ctrl->EventRingCycleState ^= 1;
+        }
+    }
+
+    DebugStr("XHCIFuncInt exit, DequeueIdx="); DebugU32(Ctrl->EventRingDequeueIdx); DebugChar('\n');
+
+    Ctrl->RuntimeRegs->Interrupter[0].ERDP.U =
+        ((u64)&Ctrl->EventRingTRBs[Ctrl->EventRingDequeueIdx]) | (1ULL << 3);
+
     LocalApicEOI();
 }
 
@@ -134,13 +182,29 @@ __attribute__((naked)) void XHCIInt(){
     );
 }
 
-void SendCommandRingWriteOnly(xHCIController* Ctrl, xHCITransferRequestBlock TRB, u64 Idx){
+void SendCommandRing(xHCIController* Ctrl, xHCITransferRequestBlock TRB){
+    if (Ctrl->CommandRingCount >= 63) {
+        DebugStr("Command Ring Full!\n");
+        return;
+    }
+    u32 Idx=Ctrl->CommandRingEnqueueIdx;
     Ctrl->CommandRingTRBs[Idx].NormalTRBField0.U = TRB.NormalTRBField0.U;
     Ctrl->CommandRingTRBs[Idx].NormalTRBField1.U = TRB.NormalTRBField1.U;
     Ctrl->CommandRingTRBs[Idx].NormalTRBField2.U = TRB.NormalTRBField2.U;
+    Ctrl->CommandRingTRBs[Idx].NormalTRBField2.CycleBit = Ctrl->CommandRingCycleState;
+
+    u32 Next = (Idx + 1) & 0x3F;
+    if (Next == 63) {
+        Ctrl->CommandRingTRBs[63].NormalTRBField2.CycleBit = Ctrl->CommandRingCycleState;
+        Ctrl->CommandRingCycleState ^= 1;
+        Next = 0;
+    }
+
+    Ctrl->CommandRingEnqueueIdx = Next;
+    Ctrl->CommandRingCount++;
 
     MemFlash();
-
+    
     Ctrl->DoorbellRegs[0].U = 0;
 }
 
@@ -153,6 +217,7 @@ xHCIController* InitXHCI() {
     if (Base == 0) return NULL;
 
     xHCIController* Ctrl = AlignedAlloc(&KernelPool, sizeof(xHCIController), 64);
+    GlobalXHCI=Ctrl;
     Ctrl->CapabilityRegs  = (xHCIRegsCapability*)Base;
     Ctrl->OperationalRegs = (xHCIRegsOperational*)(Base + Ctrl->CapabilityRegs->CAPLENGTH);
     Ctrl->RuntimeRegs     = (xHCIRegsRuntime*)(Base + Ctrl->CapabilityRegs->RTSOFF.U);
@@ -179,17 +244,24 @@ xHCIController* InitXHCI() {
         __asm__("pause");
     }
 
-    Ctrl->OperationalRegs->DCBAAP.U = (u64)(Ctrl->xHCIDCBAAList);
-    Ctrl->OperationalRegs->CRCR.U = ((u64)&Ctrl->CommandRingTRBs[0]) | 1ULL;
-
     MemSet((u8*)Ctrl->CommandRingTRBs,0,sizeof(Ctrl->CommandRingTRBs));
     Ctrl->CommandRingTRBs[63].NormalTRBField0.Base = (u64)(&Ctrl->CommandRingTRBs[0]);
     Ctrl->CommandRingTRBs[63].NormalTRBField2.TRBType = 6;
     Ctrl->CommandRingTRBs[63].NormalTRBField2.CycleBit = 1;
 
-    Ctrl->ERST[0].rwEventRingSegmentBaseAddress = (u64)&Ctrl->EventRingTRBs[0];
+    Ctrl->OperationalRegs->DCBAAP.U = (u64)(Ctrl->xHCIDCBAAList);
+    Ctrl->OperationalRegs->CRCR.U = ((u64)&Ctrl->CommandRingTRBs[0]) | 1ULL;
+
+    DebugStr("ERST[0] before write: Base = 0x"); DebugU64(Ctrl->ERST[0].rwEventRingSegmentBaseAddress); DebugChar('\n');
+    Ctrl->ERST[0].U = (u64)&Ctrl->EventRingTRBs[0];
     Ctrl->ERST[0].EventRingSegmentSize.rwEventRingSegmentSize = 256;
     Ctrl->ERST[0].rwRsvdZ0 = 0;
+    DebugStr("ERST[0].Base = 0x"); DebugU64(Ctrl->ERST[0].rwEventRingSegmentBaseAddress); DebugChar('\n');
+    DebugStr("ERST[0].Size = 0x"); DebugU64(Ctrl->ERST[0].EventRingSegmentSize.U); DebugChar('\n');
+    DebugStr("ERST[0].Rsvd = 0x"); DebugU64(Ctrl->ERST[0].rwRsvdZ0); DebugChar('\n');
+
+    __asm__ volatile("clflush (%0)" :: "r"((u64)&Ctrl->ERST[0]) : "memory");
+    __asm__ volatile("mfence" ::: "memory");
 
     Ctrl->RuntimeRegs->Interrupter[0].ERSTSZ.rwEventRingSegmentTableSize = 1;
     Ctrl->RuntimeRegs->Interrupter[0].ERSTBA.rwEventRingSegmentTableBaseAddressRegisteBase = (u64)&Ctrl->ERST[0];
@@ -205,7 +277,7 @@ xHCIController* InitXHCI() {
         if (CapID == 0x05) {
             u8 Data = PCIReadBYTE(Bus, Dev, Func, CapPtr + 2);
             PCIWriteDWORD(Bus, Dev, Func, CapPtr + 4, 0xFEE00000);
-            PCIWriteWORD(Bus, Dev, Func, CapPtr + 8, 0xEC);
+            PCIWriteWORD(Bus, Dev, Func, CapPtr + 8, 0xED);
             Data |= 0x01;
             PCIWriteBYTE(Bus, Dev, Func, CapPtr + 2, Data);
             DebugStr("MSI configured\n");
@@ -220,16 +292,46 @@ xHCIController* InitXHCI() {
             volatile u32* MsixEntry = (volatile u32*)(BarBaseAddress + TableOffset);
             MsixEntry[0] = 0xFEE00000;
             MsixEntry[1] = 0x00000000;
-            MsixEntry[2] = 0x000000EC;
+            MsixEntry[2] = 0x000000ED;
             MsixEntry[3] = 0x00000000;
 
             MsgCtrl |= (1 << 15);
+            MsgCtrl &= ~(1 << 14);
+            MemFullFlash();
             PCIWriteWORD(Bus, Dev, Func, CapPtr + 2, MsgCtrl);
+            DebugStr("MSI-X TableInfo = 0x"); DebugU32(TableInfo); DebugChar('\n');
+            DebugStr("MSI-X BIR = "); DebugU32(Bir); DebugChar('\n');
+            DebugStr("MSI-X TableOffset = 0x"); DebugU32(TableOffset); DebugChar('\n');
+            DebugStr("MSI-X BAR base = 0x"); DebugU64(BarBaseAddress); DebugChar('\n');
+            DebugStr("MSI-X MsixEntry addr = 0x"); DebugU64((u64)MsixEntry); DebugChar('\n');
             DebugStr("MSI-X configured\n");
+
+            u16 MsgCtrlRead = PCIReadWORD(Bus, Dev, Func, CapPtr + 2);
+            DebugStr("MSI-X MsgCtrl after config = 0x"); DebugU16(MsgCtrlRead); DebugChar('\n');
+            volatile u32 vc = MsixEntry[3];
+            DebugStr("MSI-X VectorControl = 0x"); DebugU32(vc); DebugChar('\n');
+
+            u16 Before = PCIReadWORD(Bus, Dev, Func, CapPtr + 2);
+            DebugStr("MsgCtrl before = 0x"); DebugU16(Before); DebugChar('\n');
+
+            u16 NewMsgCtrl = MsgCtrl | (1 << 15);
+            NewMsgCtrl &= ~(1 << 14);
+            PCIWriteWORD(Bus, Dev, Func, CapPtr + 2, NewMsgCtrl);
+
+            u16 After = PCIReadWORD(Bus, Dev, Func, CapPtr + 2);
+            DebugStr("MsgCtrl after = 0x"); DebugU16(After); DebugChar('\n');
             break;
         }
         CapPtr = NextCapPtr;
     }
+
+    Ctrl->EventRingDequeueIdx=0;
+    Ctrl->EventRingCycleState=1;
+    Ctrl->CommandRingCount=0;
+    Ctrl->CommandRingCycleState=1;
+    Ctrl->CommandRingEnqueueIdx=0;
+
+    Ctrl->OperationalRegs->USBSTS.rw1cHostSystemError=1;
 
     __asm__ volatile("mfence" ::: "memory");
 
@@ -237,8 +339,23 @@ xHCIController* InitXHCI() {
     PrintRegsValue(Ctrl);
     PrintRegsAddr(Ctrl);
 
+    DUMP_STS("before RS=1");
+
+    MemFullFlash();
+
+    DebugStr("&EventRingTRBs[0]  = 0x"); DebugU64((u64)&Ctrl->EventRingTRBs[0]);  DebugChar('\n');
+    DebugStr("&EventRingTRBs[256]= 0x"); DebugU64((u64)&Ctrl->EventRingTRBs[256]);DebugChar('\n');
+    DebugStr("&ERST[0]           = 0x"); DebugU64((u64)&Ctrl->ERST[0]);          DebugChar('\n');
+    DebugStr("&CommandRingTRBs[0]= 0x"); DebugU64((u64)&Ctrl->CommandRingTRBs[0]);DebugChar('\n');
+    DebugStr("sizeof(TRB)        = "); DebugU32(sizeof(xHCITransferRequestBlock)); DebugChar('\n');
+    DebugStr("sizeof(ERST entry) = "); DebugU32(sizeof(xHCIEventRingSegmentTableEntry)); DebugChar('\n');
+
+    Ctrl->RuntimeRegs->Interrupter[0].IMAN.rw1cInterruptPending = 1;
+
     Ctrl->OperationalRegs->USBCMD.rwRunStop = 1;
     while (Ctrl->OperationalRegs->USBSTS.roHCHalted) __asm__("pause");
+
+    DUMP_STS("after RS=1");
 
     DebugStr("Run xHCI!!!!!\n");
 
@@ -255,11 +372,12 @@ xHCIController* InitXHCI() {
     }
     Ctrl->OperationalRegs->USBCMD.rwInterrupterEnable=1;
     Ctrl->RuntimeRegs->Interrupter[0].IMAN.rwInterruptEnable=1;
-    xHCITransferRequestBlock TRBs={{.U=0},{.U=0},{.CycleBit=1,.TRBType=9}};
-    SendCommandRingWriteOnly(Ctrl,TRBs,0);
+
+    DUMP_STS("after ports");
 
     PrintRegsValue(Ctrl);
 
     DebugStr("xHCI Started Successfully!\n");
+
     return Ctrl;
 }

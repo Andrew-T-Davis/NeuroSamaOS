@@ -22,8 +22,14 @@ void PCIWriteDWORD(u8 Bus, u8 Slot, u8 Func, u8 Offset, u32 Value)
 
 void PCIWriteWORD(u8 Bus, u8 Slot, u8 Func, u8 Offset, u16 Value)
 {
-    outl(PCI_CONFIG_ADDRESS, PCIAddr((u8)Bus, Slot, Func, Offset));
-    outw(PCI_CONFIG_DATA, Value);
+    u32 Addr = PCIAddr((u8)Bus, Slot, Func, Offset);
+    outl(PCI_CONFIG_ADDRESS, Addr);
+    u32 Old = inl(PCI_CONFIG_DATA);
+    u32 Shift = (Offset & 0x2) * 8;
+    u32 Mask = ~(0xFFFFU << Shift);
+    u32 New = (Old & Mask) | ((u32)Value << Shift);
+    outl(PCI_CONFIG_ADDRESS, Addr);
+    outl(PCI_CONFIG_DATA, New);
 }
 
 u16 PCIReadWORD(u8 Bus, u8 Slot, u8 Func, u8 Offset)
@@ -47,8 +53,14 @@ u8 PCIReadBYTE(u8 Bus, u8 Slot, u8 Func, u8 Offset)
 
 void PCIWriteBYTE(u8 Bus, u8 Slot, u8 Func, u8 Offset, u8 Value)
 {
-    outl(PCI_CONFIG_ADDRESS, PCIAddr((u8)Bus, Slot, Func, Offset));
-    outb(PCI_CONFIG_DATA, Value);
+    u32 Addr = PCIAddr((u8)Bus, Slot, Func, Offset);
+    outl(PCI_CONFIG_ADDRESS, Addr);
+    u32 Old = inl(PCI_CONFIG_DATA);
+    u32 Shift = (Offset & 0x3) * 8;
+    u32 Mask = ~(0xFFU << Shift);
+    u32 New = (Old & Mask) | ((u32)Value << Shift);
+    outl(PCI_CONFIG_ADDRESS, Addr);
+    outl(PCI_CONFIG_DATA, New);
 }
 
 void PCIEnableDevice(u8 Bus, u8 Slot, u8 Func)
@@ -445,7 +457,7 @@ u8 PCIReadBusNumber(u8 Bus, u8 Slot, u8 Func) {
 }
 
 Bool PCIIsBridge(u8 Bus, u8 Slot, u8 Func) {
-    u32 ClassRev = PCIReadDWORD((u8)Bus, Slot, Func, 0x08);
+    u32 ClassRev = PCIReadDWORD((u8)Bus, (u8)Slot, (u8)Func, 0x08);
     u8 ClassCode = (ClassRev >> 24) & 0xFF;
     u8 SubClass = (ClassRev >> 16) & 0xFF;
     return (ClassCode == 0x06 && SubClass == 0x04);

@@ -72,17 +72,20 @@ QEMU_BASE = \
         -m 2G \
         -smp 2,sockets=1,cores=2,threads=1 \
         -device ahci,id=ahci \
+        -drive file=disk.qcow2,format=qcow2,if=none,id=ahcidisk \
+        -device ide-hd,bus=ahci.1,drive=ahcidisk \
         -drive file=fat:rw:disk,format=raw,if=none,id=fatdisk \
         -device ide-hd,bus=ahci.0,drive=fatdisk \
-        -device qemu-xhci,id=xhci0 \
+        -device qemu-xhci,id=xhci0,msi=on,msix=on \
         -device usb-kbd,bus=xhci0.0 \
         -device usb-mouse,bus=xhci0.0 \
         -vga none \
         -device virtio-vga \
         -display sdl,gl=on \
-        -serial stdio \
         -trace events=./xhci.trace \
-        -d guest_errors,unimp
+        -d guest_errors,unimp \
+		-serial file:serial.log \
+		-monitor stdio \
 
 QEMU_BASE-ps2 = \
         -machine q35,hpet=on \
@@ -92,14 +95,17 @@ QEMU_BASE-ps2 = \
         -m 2G \
         -smp 2,sockets=1,cores=2,threads=1 \
         -device ahci,id=ahci \
+        -drive file=disk.qcow2,format=qcow2,if=none,id=ahcidisk \
+        -device ide-hd,bus=ahci.1,drive=ahcidisk \
         -drive file=fat:rw:disk,format=raw,if=none,id=fatdisk \
         -device ide-hd,bus=ahci.0,drive=fatdisk \
         -device qemu-xhci,id=xhci0 \
         -vga none \
         -device virtio-vga \
         -display sdl,gl=on \
-        -serial stdio \
-        -d guest_errors,unimp
+        -d guest_errors,unimp \
+		-serial file:serial.log \
+		-monitor stdio \
 
 QEMU_AUDIO = \
 	-audiodev pa,id=audio_ac97 \

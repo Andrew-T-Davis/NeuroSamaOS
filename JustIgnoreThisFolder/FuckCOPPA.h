@@ -1,7 +1,7 @@
 #pragma once
-#include "int.h"
+#include "../int.h"
 
-struct In2026yyyy8mm26dd {
+struct In2026yyyy08mm26dd {
     Bool COPPAIsShit;
     Bool FuckCOPPA;
     Bool COPPAIsBitch;
@@ -12,4 +12,10 @@ struct In2026yyyy8mm26dd {
     Bool DontIncludeThisFileBtw;
     Bool MyBoolIsUnsignedCharBtw;
     Bool IUseFTPAndGoogleDriveNow;
+    Bool CallDydudu37d;
+};
+
+struct In2026yyyy10mm16dd {
+    Bool IHaveTheFuckingNewGitHubAccountNow;
+    Bool CallAndrewTDavis;
 };

@@ -141,18 +141,18 @@ typedef volatile struct {
 
 typedef volatile struct {
     union {
-        volatile u64 U;
+        volatile u32 U;
         struct {
-            volatile u64 RsvdZ0 : 2;
-            volatile u64 D      : 62;
+            volatile u32 RsvdZ0 : 2;
+            volatile u32 D      : 30;
         };
     };
 } __attribute__((packed)) xHCIRegInputControlContextField0;
 
 typedef volatile struct {
     union {
-        volatile u64 A;
-        volatile u64 U;
+        volatile u32 A;
+        volatile u32 U;
     };
 } __attribute__((packed)) xHCIRegInputControlContextField1;
 
@@ -199,6 +199,18 @@ typedef volatile struct {
     volatile u32                              RsvdO3[5];
     volatile xHCIRegInputControlContextField2 Field2;
 } __attribute__((packed)) xHCIInputControlContext;
+
+typedef volatile struct {
+    xHCIInputControlContext InputControl;
+    xHCISlotContext         SlotContext;
+    struct {
+        volatile xHCIRegEndpointContextField0 Field0;
+        volatile xHCIRegEndpointContextField1 Field1;
+        volatile xHCIRegEndpointContextField2 Field2;
+        volatile xHCIRegEndpointContextField3 Field3;
+        volatile u32                          RsvdO1[3];
+    } EndpointContext[31];
+} __attribute__((packed)) xHCIInputContext;
 
 typedef volatile struct {
     volatile u8 RsvdZ0[1];
@@ -828,14 +840,11 @@ typedef struct {
     __attribute__((aligned(64))) u64               xHCIDCBAAList[256];
 
     u32 EventRingCycleState;
-    u32 CommandRingCycleState;
-    
-    u32 UsedSlots;
-    u32 LastSlotID;
-    u32 CommandRingEnqueueIdx;
+    u32 EventRingDequeueIdx;
 
-    u32 PendingCommandType;
-    u8  CommandPending;
+    u32 CommandRingCycleState;
+    u32 CommandRingEnqueueIdx;
+    u32 CommandRingCount;
 } xHCIController;
 
 typedef struct {
@@ -851,3 +860,6 @@ typedef struct {
 u64 GetXHCIMMIO();
 xHCIController* InitXHCI();
 __attribute__((naked)) void XHCIInt();
+void SendCommandRing(xHCIController* Ctrl, xHCITransferRequestBlock TRB);
+void PrintRegsValue(xHCIController* Controller);
+void PrintRegsAddr(xHCIController* Controller);

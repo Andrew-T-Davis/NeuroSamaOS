@@ -1,4 +1,6 @@
 #include "FreedomDiskFourDimensions.h"
+#include "debug.h"
+#include "flash.h"
 #include "int.h"
 #include "DiskIO.h"
 #include "ahci.h"
@@ -152,4 +154,18 @@ void NewFolder(FDFDFolderTable Table, u8 Idx, u8* Data){
     
     Free(&KernelPool, Header);
     Free(&KernelPool, NewBuffer);
+}
+
+void InitDiskToFDFD(u8 Idx){
+    u8 Buffer[512];
+    MemSet(Buffer, 0, 512);
+    FDFDHeader* Header=(FDFDHeader*)(&Buffer[0]);
+    Header->Sign0xFDFD=0xFDFD;
+    Header->CountOfSector=1;
+    Header->SizeOfData=0;
+    MemFullFlash();
+    WriteDisk(GlobalAHCICtrl, Idx, Buffer, 1, 0);
+    for (u64 BufferIdx = 0; BufferIdx < 512; BufferIdx++) Buffer[BufferIdx] = 0xAA;
+    ReadDiskToBuffer(GlobalAHCICtrl, Idx, 1, 0, Buffer);
+    DebugStr(MemCmp(Buffer,Header,sizeof(FDFDHeader)) ? "DMA WRITE/READ OK\n" : "DMA MISMATCH!\n");
 }
