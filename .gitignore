@@ -15,4 +15,3 @@ words.txt
 *.log
 disk
 disk/*
-*.qcow2

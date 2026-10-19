@@ -72,7 +72,7 @@ QEMU_BASE = \
         -m 2G \
         -smp 2,sockets=1,cores=2,threads=1 \
         -device ahci,id=ahci \
-        -drive file=disk.qcow2,format=qcow2,if=none,id=ahcidisk \
+        -drive file=AndysDisk.qcow2,format=qcow2,if=none,id=ahcidisk \
         -device ide-hd,bus=ahci.1,drive=ahcidisk \
         -drive file=fat:rw:disk,format=raw,if=none,id=fatdisk \
         -device ide-hd,bus=ahci.0,drive=fatdisk \
@@ -95,7 +95,7 @@ QEMU_BASE-ps2 = \
         -m 2G \
         -smp 2,sockets=1,cores=2,threads=1 \
         -device ahci,id=ahci \
-        -drive file=disk.qcow2,format=qcow2,if=none,id=ahcidisk \
+        -drive file=AndysDisk.qcow2,format=qcow2,if=none,id=ahcidisk \
         -device ide-hd,bus=ahci.1,drive=ahcidisk \
         -drive file=fat:rw:disk,format=raw,if=none,id=fatdisk \
         -device ide-hd,bus=ahci.0,drive=fatdisk \

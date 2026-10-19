@@ -297,16 +297,16 @@ int StrSplit(char* Str, char Split, char** left, char** right) {
     return 0;
 }
 
-Bool MemCmp(const void* S1, const void* S2, u32 N) {
+Bool MemCmp(const void* S1, const void* S2, u64 N) {
     if (N == 0) return true;
     
     const u8* P1 = (const u8*)S1;
     const u8* P2 = (const u8*)S2;
     
     if (N >= 256 && ((u64)P1 & 0x1F) == 0 && ((u64)P2 & 0x1F) == 0) {
-        u32 loops = N >> 5;
-        u32 remainder = N & 0x1F;
-        u32 result = 0;
+        u64 loops = N >> 5;
+        u64 remainder = N & 0x1F;
+        u64 result = 0;
         
         __asm__ volatile(
             "1:\n\t"
@@ -317,7 +317,7 @@ Bool MemCmp(const void* S1, const void* S2, u32 N) {
             "jne 2f\n\t"
             "addq $32, %1\n\t"
             "addq $32, %2\n\t"
-            "decl %3\n\t"
+            "decq %3\n\t"
             "jnz 1b\n\t"
             "2:\n\t"
             "sete %b0\n\t"

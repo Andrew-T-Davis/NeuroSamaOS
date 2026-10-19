@@ -20,7 +20,7 @@ Bool StrIsNoCaseWithSize(const char* D, const char* S,Size64 Size);
 u64 HowManyCharInString(char* String,char Char);
 u64 HowManyCharInStringWithSize(char* String,char Char,Size64 Size);
 
-Bool MemCmp(const void* S1, const void* S2, u32 N);
+Bool MemCmp(const void* S1, const void* S2, u64 N);
 
 u8 StrToU8(char* S, Bool DecOrHex);
 u16 StrToU16(char* S, Bool DecOrHex);
