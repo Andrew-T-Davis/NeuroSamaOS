@@ -2,5 +2,5 @@
 
 #include "int.h"
 
-Bool PasswdWord(char* String);
-void NewPasswd(char* String);
+Bool PasswdWord(u16* String);
+void NewPasswd(u16* String);

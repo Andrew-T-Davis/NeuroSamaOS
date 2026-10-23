@@ -9,7 +9,7 @@
 
 extern AllocPool KernelPool;
 extern WM KernelGlobalWindowManager;
-extern u32 KernelEnglishFonts[255][19][8];
+extern u16 KernelFonts[65536][19];
 static u64 SystemInfoCount = 0;
 
 void GlobalSystemInfoExit(void* Self) {
@@ -74,7 +74,7 @@ void GlobalSystemInfoDraw(void* Self) {
         WinSelf->Title ? WinSelf->Title : "Window",
         PACK_COLOR(0x00, 0x00, 0x00, 0x00),
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
-        KernelEnglishFonts
+        KernelFonts
     );
     GOPRectFill(
         (u32[2]){(u32)WinSelf->Base.x, (u32)WinSelf->Base.x + (u32)WinSelf->Base.w},
@@ -91,7 +91,7 @@ void GlobalSystemInfoDraw(void* Self) {
         ,
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
         PACK_COLOR(0x00, 0x00, 0x00, 0xFF),
-        KernelEnglishFonts
+        KernelFonts
     );
 }
 

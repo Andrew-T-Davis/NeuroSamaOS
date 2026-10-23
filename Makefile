@@ -32,7 +32,7 @@ BIG_SOBJS = $(wildcard *.S)
 O_OBJS = $(patsubst %.c,%.o,$(C_OBJS)) \
          $(patsubst %.s,%.o,$(S_OBJS)) \
          $(patsubst %.S,%.o,$(BIG_SOBJS)) \
-		 words.o AudioData.o
+		 words.o AudioData.o unifont.o
 
 all: boot.efi
 
@@ -63,6 +63,23 @@ boot.efi: $(O_OBJS)
 	$(LD) $(LDArg) $^ -o boot.exe
 	llvm-objcopy --subsystem=efi-app boot.exe $@
 	rm boot.exe
+
+unifont.bin: unifont.hex
+	LC_ALL=C awk -F: '$$1 ~ /^[0-9a-fA-F]+$$/ && (length($$2)==32 || length($$2)==64) { \
+		n=0; \
+		for(i=1;i<=length($$1);i++){c=tolower(substr($$1,i,1));n=n*16+index("0123456789abcdef",c)-1} \
+		if (n > 0xFFFF) next; \
+		if (length($$2)==64) { print n, $$2 } \
+		else { out=""; for(i=0;i<16;i++) out = out substr($$2, i*2+1, 2) "00"; print n, out } \
+	}' unifont.hex | LC_ALL=C sort -n | LC_ALL=C awk '{ \
+		cp=$$1; \
+		while(last+1<cp){ printf "0000000000000000000000000000000000000000000000000000000000000000"; last++ } \
+		printf "%s", $$2; \
+		last=cp \
+	}' | xxd -r -p > unifont.bin
+
+unifont.o: unifont.bin
+	objcopy -I binary -O pe-x86-64 -B i386 $< $@
 
 QEMU_BASE = \
         -machine q35,hpet=on \

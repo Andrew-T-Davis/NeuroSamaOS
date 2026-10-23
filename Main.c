@@ -32,7 +32,8 @@
 
 #define KERNEL_STACK_SIZE ((1<<20)*288) 
 
-__attribute__((section(".bss"))) __attribute__((aligned(64))) u32 KernelEnglishFonts[256][19][8];
+extern const unsigned char _binary_unifont_bin_start[];
+__attribute__((section(".bss"))) __attribute__((aligned(64))) u16 KernelFonts[65536][19];
 u8 *KernelPoolHeadList=NULL;
 u8* KernelStack=NULL;
 
@@ -604,14 +605,14 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
         DebugU64(TrueImageBase);
         DebugStr("\r\n[NeuroSamaOS] IMAGE SIZE: ");
         DebugU64(TrueImageSize);
-        DebugChar('\n');
+        DebugChar(L'\n');
         CodeStart=TrueImageBase;
         CodeEnd=TrueImageBase+TrueImageSize;
 
     } else {
         DebugStr("\r\n[ERROR] HandleProtocol failed to fetch ImageBase! Code: ");
         DebugU64(status);
-        DebugChar('\n');
+        DebugChar(L'\n');
     }
 
     bs->LocateProtocol(&GopGuid, NULL, (void **)&Gop);
@@ -714,41 +715,24 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
         }
     }
     sys->ConOut->ClearScreen(sys->ConOut);
-    MemSet(KernelEnglishFonts, 0, 256 * 8 * 19 * 4);
-    EFI_HII_FONT_PROTOCOL *HiiFont = NULL;
-    bs->LocateProtocol(&gEfiHiiFontProtocolGuid, NULL, (void**)&HiiFont);
-    for (u64 i = 0; i < 256; i++) {
-        EFI_IMAGE_OUTPUT *Blt = NULL;
-        EFI_FONT_DISPLAY_INFO Info;
-        MemSet(&Info,0,sizeof(EFI_FONT_DISPLAY_INFO));
-        Info.FontInfoMask = EFI_FONT_INFO_SYS_FONT | EFI_FONT_INFO_SYS_SIZE;
-        
-        status = HiiFont->GetGlyph(HiiFont, (u16)i, NULL, &Blt, NULL);
-        
-        if (Blt && Blt->Image.Bitmap) {
-            if (Blt->Width == 8 && Blt->Height == 19) {
-                u32 *dst = (u32*)((u8*)KernelEnglishFonts + i * 8 * 19 * 4);
-                MemCopy(dst, Blt->Image.Bitmap, 8 * 19 * 4);
-                bs->FreePool(Blt->Image.Bitmap);
-                bs->FreePool(Blt);
-                continue;
-            }else{
-                u32 srcW = Blt->Width;
-                u32 srcH = Blt->Height;
-                u32 *src = (u32*)Blt->Image.Bitmap;
-                u32 *dst = (u32*)((u8*)KernelEnglishFonts + i * 8 * 19 * 4);
-                MemCopy(dst, Blt->Image.Bitmap, 8 * 19 * 4);
-                
-                for (u32  row = 0; row < 19; row++) {
-                    for (u32 col = 0; col < 8; col++) {
-                        u32 srcRow = (row * srcH) / 19;
-                        u32 srcCol = (col * srcW) / 8;
-                        dst[row * 8 + col] = src[srcRow * srcW + srcCol];
-                    }
-                }
-                bs->FreePool(Blt->Image.Bitmap);
-                bs->FreePool(Blt);
+    MemSet(KernelFonts, 0, sizeof(KernelFonts));
+    for (u64 i = 0; i < 65536; i++) {
+        if (i >= 0xD800 && i <= 0xDFFF) continue;
+        if (i == 0x0000) continue;
+
+        const unsigned char *g = _binary_unifont_bin_start + i * 32;
+
+        for (u32 Row = 0; Row < 19; Row++)
+            KernelFonts[i][Row] = 0;
+
+        for (u32 Row = 0; Row < 16; Row++) {
+            u16 bits = 0;
+            for (u32 Col = 0; Col < 16; Col++) {
+                u8 byte = g[Row * 2 + (Col >> 3)];
+                if (byte & (0x80u >> (Col & 7)))
+                    bits |= (u16)(0x8000u >> Col);
             }
+            KernelFonts[i][Row + ((19 - 16) / 2)] = bits;
         }
     }
 
@@ -1625,7 +1609,7 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
         .Target=NULL,
         .IntervalNs=1000000,
         .NextWaitNs=0,
-        .Name="WMTask",
+        .Name=L"WMTask",
         .CallFunc=PollWMTask,
         .DelFunc=NULL,
         .CoreID=1
@@ -1750,6 +1734,11 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     *IcrHigh = 0;
     *IcrLow  = 0x00004000 | 0xED;
 
+    DebugStr("KernelFonts['a']=\n"); 
+    for (int r = 0; r < 19; r++) {
+        DebugU64(KernelFonts['A'][r]); DebugChar('\n');
+    }
+
     u64 LastFrameTime = SystemGetTimeNano();
     while (1){
         WaitForEvent();
@@ -1760,7 +1749,7 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
                     msg,
                     PACK_COLOR(0x00, 0x00, 0x00, 0x00),
                     PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
-                    KernelEnglishFonts);
+                    KernelFonts);
         }
         Now = SystemGetTimeNano();
         
@@ -1769,7 +1758,7 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
         TaskPoll();
 
         GOPRectFill((u32[2]){0, GopInfo.HorizontalResolution}, (u32[2]){0, 21}, PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
-        GOPString(4,2,"Neuro-SamaOS :>)",PACK_COLOR(0x00, 0x00, 0x00, 0x00),PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),KernelEnglishFonts);
+        GOPString(4,2,"Neuro-SamaOS :>)",PACK_COLOR(0x00, 0x00, 0x00, 0x00),PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),KernelFonts);
 
         GOPRectFill((u32[2]){GlobalPS2Mouse.X-5,GlobalPS2Mouse.X+5}, (u32[2]){GlobalPS2Mouse.Y-5,GlobalPS2Mouse.Y+5}, PACK_COLOR(0x00, 0x00, 0x00, 0xFF));
         GOPRectFill((u32[2]){GlobalPS2Mouse.X-4,GlobalPS2Mouse.X+4}, (u32[2]){GlobalPS2Mouse.Y-4,GlobalPS2Mouse.Y+4}, PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF));

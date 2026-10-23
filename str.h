@@ -5,14 +5,13 @@
 void PingPong(void** Ping,void** Pong);
 void MemCopy(void* D,const void* S,Size64 Size);
 void MemCopySize32CountByte(u32* D,const u32* S,Size64 size_bytes);
-void StrAdd(char* Add,const char* S,Size64 Size);
+void StrAdd(u16* Add,const char* S,Size64 Size);
 void MemSet(void* D,const u8 S,Size64 Size);
 void MemSet16(void* D,const u16 S,Size64 Size);
 void MemSet32(void* D,const u32 S,Size64 Size);
 void MemSet64(void* D,const u64 S,Size64 Size);
 Bool StrIs(const char* D,const char* S);
 u64 StrLen(const char* S);
-void Bit64Str(u64 N,char* Buf);
 int StrSplit(char* Str, char Split, char** left, char** right);
 Bool StrIsNoCase(const char* D, const char* S);
 Bool StrIsWithSize(const char* D, const char* S,Size64 Size);
@@ -38,6 +37,6 @@ Size64 F32ToStr(f32 val, char* buf);
 Size64 F64ToStr(f64 val, char* buf);
 Size64 F80ToStr(f80 val, char* buf);
 
-void Reverse(char* start, char* end);
+void Reverse(u16* start, u16* end);
 
 void PingPongNotBuffer(void* a, void* b, u64 size);

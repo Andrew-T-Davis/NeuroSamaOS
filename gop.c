@@ -168,106 +168,132 @@ void GOPRectFill(u32 x[2], u32 y[2], u32 color){
     }
 }
 
-void GOPChar(u32 x, u32 y, char Char, u32 Back, u32 Front, u32 Font[256][19][8]) {
+void GOPChar(u32 x, u32 y, u16 Char, u32 Back, u32 Front, u16 Font[65536][19]) {
     if (x >= GopInfo.HorizontalResolution || y >= GopInfo.VerticalResolution ||
-        x + 8 >= GopInfo.HorizontalResolution || y + 19 >= GopInfo.VerticalResolution) return;
+        x + 16 > GopInfo.HorizontalResolution || y + 19 > GopInfo.VerticalResolution) return;
     if (((Front >> 24) & 0xFF) == 0 && ((Back >> 24) & 0xFF) == 0) return;
 
-    GOPRectFill((u32[2]){x, x + 8}, (u32[2]){y, y + 19}, Back);
-
+    GOPRectFill((u32[2]){x, x + 8*(1+Char<0xFF)}, (u32[2]){y, y + 19}, Back);
     if (((Front >> 24) & 0xFF) == 0) return;
 
     u32 *dst = GopBack + y * GopInfo.PixelsPerScanLine + x;
-    u32 *mask = Font[(int)Char][0];
+    u16 *mask = Font[Char];
 
-    if (((Front >> 24) & 0xFF) == 0xFF) {
+    u32 sA = (Front >> 24) & 0xFF;
+    if (sA == 0xFF) {
         for (int Row = 0; Row < 19; Row++) {
-            for (int col = 0; col < 8; col++) {
-                if (mask[col]) dst[col] = Front;
+            u16 m = mask[Row];
+            for (int col = 0; col < 16; col++) {
+                if (m & (0x8000u >> col)) dst[col] = Front;
             }
             dst += GopInfo.PixelsPerScanLine;
-            mask += 8;
         }
     } else {
         for (int Row = 0; Row < 19; Row++) {
-            for (int col = 0; col < 8; col++) {
-                if (mask[col]) {
-                    dst[col] = ARGBMix(dst[col], Front);
-                }
+            u16 m = mask[Row];
+            for (int col = 0; col < 16; col++) {
+                if (m & (0x8000u >> col)) dst[col] = ARGBMix(dst[col], Front);
             }
             dst += GopInfo.PixelsPerScanLine;
-            mask += 8;
         }
     }
 }
 
-void GOPString(u32 x, u32 y, char* String, u32 Back, u32 Front, u32 Font[256][19][8]) {
-    u32 NewX = x;
-    u32 NewY = y;
-    if ((x >= GopInfo.HorizontalResolution || y >= GopInfo.VerticalResolution) ||
-        x + 8 >= GopInfo.HorizontalResolution || y + 19 >= GopInfo.VerticalResolution) return;
+void GOPString(u32 x, u32 y, char *String, u32 Back, u32 Front, u16 Font[65536][19]) {
+    u32 NewX = x, NewY = y;
+    if (x >= GopInfo.HorizontalResolution || y >= GopInfo.VerticalResolution ||
+        x + 8 > GopInfo.HorizontalResolution || y + 19 > GopInfo.VerticalResolution) return;
 
-    for (u32 Idx = 0; String[Idx]; Idx++) {
-        char ch = String[Idx];
-        if (ch == '\n') {
-            NewY += 19;
-            NewX = x;
-            continue;
+    const u8 *p = (const u8*)String;
+    while (*p) {
+        u32 cp;
+        u8 c0 = p[0];
+
+        if (c0 < 0x80) {
+            cp = c0; p += 1;
+        } else if ((c0 & 0xE0) == 0xC0 && p[1] && (p[1] & 0xC0) == 0x80) {
+            cp = ((u32)(c0 & 0x1F) << 6) | (p[1] & 0x3F);
+            p += 2;
+        } else if ((c0 & 0xF0) == 0xE0 && p[1] && p[2] &&
+                   (p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80) {
+            cp = ((u32)(c0 & 0x0F) << 12) | ((u32)(p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+            p += 3;
+        } else if ((c0 & 0xF8) == 0xF0 && p[1] && p[2] && p[3] &&
+                   (p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) {
+            cp = ((u32)(c0 & 0x07) << 18) | ((u32)(p[1] & 0x3F) << 12)
+               | ((u32)(p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+            p += 4;
+        } else {
+            cp = 0xFFFD; p += 1;
         }
-        if (ch == '\r') {
-            NewX = x;
-            continue;
-        }
-        if (ch == '\b') {
-            NewX -= 8;
-            continue;
-        }
-        if (ch == '\t') {
-            NewX += 8 * 4;
-            continue;
-        }
-        GOPChar(NewX, NewY, ch, Back, Front, Font);
-        if ((NewX + 8 >= GopInfo.HorizontalResolution) || (NewX >= GopInfo.HorizontalResolution)) break;
-        else NewX += 8;
+
+        if (cp == '\n') { NewY += 19; NewX = x; continue; }
+        if (cp == '\r') { NewX = x; continue; }
+        if (cp == '\b') { if (NewX >= x + 8) NewX -= 8; continue; }
+        if (cp == '\t') { NewX += 8 * 4; continue; }
+
+        u32 Gw = (cp < 0x80) ? 8 : 16;
+
+        if (NewX + Gw > GopInfo.HorizontalResolution) break;
+        GOPChar(NewX, NewY, (u16)cp, Back, Front, Font);
+        NewX += Gw;
     }
 }
 
-void GOPStringWH(u32 x, u32 y, u32 w, u32 h, char* String, u32 Back, u32 Front, u32 Font[256][19][8]) {
+void GOPStringWH(u32 x, u32 y, u32 w, u32 h, char* String, u32 Back, u32 Front, u16 Font[65536][19]) {
     u32 NewX = x;
     u32 NewY = y;
     if (x >= GopInfo.HorizontalResolution || y >= GopInfo.VerticalResolution) return;
 
-    for (u32 Idx = 0; String[Idx]; Idx++) {
-        char ch = String[Idx];
-        if (ch == '\n') {
+    const u8 *p = (const u8*)String;
+    while (*p) {
+        u32 cp;
+        u8 c0 = p[0];
+
+        if (c0 < 0x80) {
+            cp = c0; p += 1;
+        } else if ((c0 & 0xE0) == 0xC0 && p[1] && (p[1] & 0xC0) == 0x80) {
+            cp = ((u32)(c0 & 0x1F) << 6) | (p[1] & 0x3F);
+            p += 2;
+        } else if ((c0 & 0xF0) == 0xE0 && p[1] && p[2] &&
+                   (p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80) {
+            cp = ((u32)(c0 & 0x0F) << 12) | ((u32)(p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+            p += 3;
+        } else if ((c0 & 0xF8) == 0xF0 && p[1] && p[2] && p[3] &&
+                   (p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) {
+            cp = ((u32)(c0 & 0x07) << 18) | ((u32)(p[1] & 0x3F) << 12)
+               | ((u32)(p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+            p += 4;
+        } else {
+            cp = 0xFFFD; p += 1;
+        }
+
+        if (cp == '\n') {
             NewY += 19;
             NewX = x;
             if (NewY > y + h) break;
             continue;
         }
-        if (ch == '\r') {
+        if (cp == '\r') {
             NewX = x;
             continue;
         }
-        if (ch == '\b') {
-            if (NewX - 8 >= x) {
-                NewX -= 8;
-            }
+        if (cp == '\b') {
+            if (NewX - 8 >= x) NewX -= 8;
             continue;
         }
-        if (ch == '\t') {
-            if ((NewX + (8 * 4) >= x + w) || (NewX >= x + w)) {
-                break;
-            }
+        if (cp == '\t') {
+            if ((NewX + (8 * 4) >= x + w) || (NewX >= x + w)) break;
             NewX += 8 * 4;
             continue;
         }
-        GOPChar(NewX, NewY, ch, Back, Front, Font);
-        if ((NewX + 8 >= x + w) || (NewX >= x + w)) {
-            break;
-        } else {
-            NewX += 8;
-        }
+
+        u32 Gw = (cp < 0x80) ? 8 : 16;
+
+        if ((NewX + Gw >= x + w) || (NewX >= x + w)) break;
+        GOPChar(NewX, NewY, (u16)cp, Back, Front, Font);
+        NewX += Gw;
+
         if (NewY >= y + h) break;
     }
 }

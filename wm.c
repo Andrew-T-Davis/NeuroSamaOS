@@ -114,9 +114,9 @@ Window* WMWindowsTitleOverlapping(WM* WinM, Window* WinSelf, u64 TitleHight, u64
     u64 AbsY = WinSelf->Base.y + PointY;
 
     Window* Hit = NULL;
-    Window* Node = WinM->Head;
+    Window* Node = WinM->Tail;
     while (Node != NULL) {
-        if (Node != WinSelf && Node->Base.Visible && !Node->Hide) {
+        if (Node != WinSelf && Node->Base.Visible && !Node->Hide && Node!=WinSelf) {
             u64 NodeL = Node->Base.x;
             u64 NodeT = Node->Base.y;
             u64 NodeR = Node->Base.x + Node->Base.w;
@@ -127,7 +127,7 @@ Window* WMWindowsTitleOverlapping(WM* WinM, Window* WinSelf, u64 TitleHight, u64
                 Hit = Node;
             }
         }
-        Node = Node->Next;
+        Node = Node->Pre;
     }
 
     return Hit;
@@ -147,13 +147,41 @@ void WMPollDraw(WM* WinM){
 
 void WMPollPoll(WM* WinM){
     if (!WinM) return;
-    Window* Node = WinM->Head;
+
+    Window* CheckNode = WinM->Tail;
+    while (CheckNode != NULL) {
+        if (CheckNode->IsDragging) {
+            if (CheckNode != WinM->Tail) {
+                WMUpWindow(WinM, NULL, CheckNode->SomeID);
+            }
+            break;
+        }
+        CheckNode = CheckNode->Pre;
+    }
+
+    Window* DraggingWindow = NULL;
+    Window* Temp = WinM->Tail;
+    while (Temp != NULL) {
+        if (Temp->IsDragging) {
+            DraggingWindow = Temp;
+            break;
+        }
+        Temp = Temp->Pre;
+    }
+
+    if (DraggingWindow != NULL) {
+        if (DraggingWindow->Base.Poll) {
+            DraggingWindow->Base.Poll(DraggingWindow);
+        }
+        return;
+    }
+
+    Window* Node = WinM->Tail;
     while (Node != NULL) {
-        Window* Next = Node->Next;
+        Window* Next = Node->Pre;
         if (Node->Base.Poll) {
             Node->Base.Poll(Node);
         }
         Node = Next;
     }
 }
-

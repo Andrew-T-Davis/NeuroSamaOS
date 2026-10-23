@@ -32,7 +32,7 @@ static u64 KeyRepeatPhase = 0;
 
 extern AllocPool KernelPool;
 extern WM KernelGlobalWindowManager;
-extern u32 KernelEnglishFonts[255][19][8];
+extern u16 KernelFonts[65536][19];
 
 static u64 ShellCount = 0;
 static char OldChar = 0;
@@ -126,7 +126,7 @@ static void ShellPrint(TextBox* TextSelf, char* String) {
     DebugStr(String);
 }
 
-static void ShellPrintNum64(TextBox* TextSelf, u64 Num) {
+void ShellPrintNum64(TextBox* TextSelf, u64 Num) {
     char buf[18];
     int pos = 0;
     for (u32 i = 0; i < 16; i++) {
@@ -137,6 +137,55 @@ static void ShellPrintNum64(TextBox* TextSelf, u64 Num) {
 
     ShellPrint(TextSelf, buf);
     DebugU64(Num);
+}
+
+void ShellPrintNum32(TextBox* TextSelf, u32 Num) {
+    char buf[18];
+    int pos = 0;
+    for (u32 i = 0; i < 8; i++) {
+        u64 shift = (7 - i) * 4;
+        buf[pos++] = Hex[(Num >> shift) & 0xFULL];
+    }
+    buf[pos] = '\0';
+
+    ShellPrint(TextSelf, buf);
+    DebugU32(Num);
+}
+
+void ShellPrintNum16(TextBox* TextSelf, u16 Num) {
+    char buf[18];
+    int pos = 0;
+    for (u32 i = 0; i < 4; i++) {
+        u64 shift = (3 - i) * 4;
+        buf[pos++] = Hex[(Num >> shift) & 0xFULL];
+    }
+    buf[pos] = '\0';
+
+    ShellPrint(TextSelf, buf);
+    DebugU16(Num);
+}
+
+void ShellPrintNum8(TextBox* TextSelf, u8 Num) {
+    char buf[18];
+    int pos = 0;
+    for (u32 i = 0; i < 2; i++) {
+        u64 shift = (1 - i) * 4;
+        buf[pos++] = Hex[(Num >> shift) & 0xFULL];
+    }
+    buf[pos] = '\0';
+
+    ShellPrint(TextSelf, buf);
+    DebugU8(Num);
+}
+
+void ShellPrintNum4(TextBox* TextSelf, u8 Num) {
+    char buf[18];
+    int pos = 0;
+    buf[pos++] = Hex[Num & 0xFULL];
+    buf[pos] = '\0';
+
+    ShellPrint(TextSelf, buf);
+    DebugU8(Num);
 }
 
 void ProcessCommand(TextBox* TextSelf, LineShell* Line, Window* WinSelf) {
@@ -201,8 +250,8 @@ void ProcessCommand(TextBox* TextSelf, LineShell* Line, Window* WinSelf) {
         ShellPrint(TextSelf, "Neuro-Sama OS (Pre-Alfa " BUILD_DATE ")\n");
         ShellPrint(TextSelf, "Producer: Andy / AndyFish / Fish / Dydudu37d (All Is Me)\n");
         ShellPrint(TextSelf, "License: MIT License\n");
-        ShellPrint(TextSelf, "Nickname: Fish\n");
-        ShellPrint(TextSelf, "You Should Download It From An FTP Server, \nGoogle Drive, Or A Chinese Cloud Storage Service. \nIf Not, Be Wary Of Potential Piracy.\n");
+        ShellPrint(TextSelf, "Nickname: Andrew Terrence Davis\n");
+        ShellPrint(TextSelf, "You Should Download It From An FTP Server, \nGoogle Drive, GitHub, Or A Chinese Cloud Storage Service. \nIf Not, Be Wary Of Potential Piracy.\n");
         ShellPrint(TextSelf, "Have Fun!\n");
     }
     else if (StrIsWithSize(Cmd, "CpuID", 6) || StrIsWithSize(Cmd, "CpuInfo", 8)) {
@@ -219,28 +268,28 @@ void ProcessCommand(TextBox* TextSelf, LineShell* Line, Window* WinSelf) {
         ShellPrint(TextSelf, "\n");
         
         ShellPrint(TextSelf, "Max Standard Leaf: 0x");
-        ShellPrintNum64(TextSelf, vendor.Eax);
+        ShellPrintNum32(TextSelf, vendor.Eax);
         ShellPrint(TextSelf, "\n");
         
         CpuInfoResult features = CpuInfo(1, 0);
         ShellPrint(TextSelf, "Family: 0x");
-        ShellPrintNum64(TextSelf, (features.Eax >> 8) & 0xF);
+        ShellPrintNum4(TextSelf, (features.Eax >> 8) & 0xF);
         ShellPrint(TextSelf, ", Model: 0x");
-        ShellPrintNum64(TextSelf, (features.Eax >> 4) & 0xF);
+        ShellPrintNum4(TextSelf, (features.Eax >> 4) & 0xF);
         ShellPrint(TextSelf, ", Stepping: 0x");
-        ShellPrintNum64(TextSelf, features.Eax & 0xF);
+        ShellPrintNum4(TextSelf, features.Eax & 0xF);
         ShellPrint(TextSelf, "\n");
         
         ShellPrint(TextSelf, "SSE3: ");
-        ShellPrintNum64(TextSelf, (features.Ecx >> 0) & 1);
+        ShellPrint(TextSelf, ((features.Ecx >> 0) & 1) ? "Yes" : "No");
         ShellPrint(TextSelf, ", AVX: ");
-        ShellPrintNum64(TextSelf, (features.Ecx >> 28) & 1);
+        ShellPrint(TextSelf, ((features.Ecx >> 28) & 1) ? "Yes" : "No");
         ShellPrint(TextSelf, "\n");
         
         if (vendor.Eax >= 0x07) {
             CpuInfoResult leaf7 = CpuInfo(7, 0);
             ShellPrint(TextSelf, "AVX2: ");
-            ShellPrintNum64(TextSelf, (leaf7.Ebx >> 5) & 1);
+            ShellPrint(TextSelf, ((leaf7.Ebx >> 5) & 1) ? "Yes" : "No");
             ShellPrint(TextSelf, "\n");
         } else {
             ShellPrint(TextSelf, "AVX2: Not Supported (Leaf 7 not available)\n");
@@ -248,34 +297,41 @@ void ProcessCommand(TextBox* TextSelf, LineShell* Line, Window* WinSelf) {
         
         CpuInfoResult ext = CpuInfo(0x80000000, 0);
         ShellPrint(TextSelf, "Max Extended Leaf: 0x");
-        ShellPrintNum64(TextSelf, ext.Eax);
+        ShellPrintNum32(TextSelf, ext.Eax);
         ShellPrint(TextSelf, "\n");
         
         if (ext.Eax >= 0x80000001) {
             CpuInfoResult longmode = CpuInfo(0x80000001, 0);
             ShellPrint(TextSelf, "Long Mode: ");
-            ShellPrintNum64(TextSelf, (longmode.Edx >> 29) & 1);
+            ShellPrint(TextSelf, ((longmode.Edx >> 29) & 1) ? "Yes" : "No");
             ShellPrint(TextSelf, "\n");
         }
 
         ShellPrint(TextSelf, "Mode ID: ");
-        char CpuMode[49];
-        MemSet(CpuMode,0,40);
+        char CpuMode[57];
+        MemSet(CpuMode,0,57);
         for (u32 Leaf=0x80000002;Leaf<0x80000005;Leaf++){
             CpuInfoResult ModeID = CpuInfo(Leaf, 0);
             char* ModeIDList=(char*)&ModeID;
             MemCopy(CpuMode+(16*((Leaf&0x07UL)-0x2)),ModeIDList,16);
         }
-        CpuMode[48]='\0';
+        CpuMode[56]='\0';
         ShellPrint(TextSelf, CpuMode);
         ShellPrint(TextSelf, "\n");
     }
     else if (StrIsWithSize(Cmd, "Sin ", 4) && CmdLen>4){
+        union {
+            u64 U;
+            f64 F;
+        } Sin;
         char Buffer[256];
         MemSet(Buffer,0,256);
-        F64ToStr(DoubleSin(StrToF64(Cmd+4)), Buffer);
+        Sin.F=DoubleSin(StrToF64(Cmd+4));
+        F64ToStr(Sin.F, Buffer);
         ShellPrint(TextSelf,Buffer);
-        ShellPrint(TextSelf, "\n");
+        ShellPrint(TextSelf," (0x");
+        ShellPrintNum64(TextSelf, Sin.U);
+        ShellPrint(TextSelf, ")\n");
     }
     else if (StrIsWithSize(Cmd, "Notepad", 8)){
         NewNotepadWindow();
@@ -285,6 +341,16 @@ void ProcessCommand(TextBox* TextSelf, LineShell* Line, Window* WinSelf) {
     }
     else if (StrIsWithSize(Cmd, "SystemInfo", 11)){
         NewSystemInfoWindow();
+    }
+    else if (StrIsWithSize(Cmd, "WongHauDaaiDouDung", 19)){
+        ShellPrint(TextSelf,"皇后大道西 又 皇后大道东\n");
+        ShellPrint(TextSelf,"Wong4 Hau6 Daai6 Dou6 Sai1 Jau6 Wong4 Hau6 Daai6 Dou6 Dung1\n");
+        ShellPrint(TextSelf,"皇后大道东 转 皇后大道中\n");
+        ShellPrint(TextSelf,"Wong4 Hau6 Daai6 Dou6 Dung1 Zyun2 Wong4 Hau6 Daai6 Dou6 Zung1\n");
+        ShellPrint(TextSelf,"皇后大道东 上 为何無皇宮\n");
+        ShellPrint(TextSelf,"Wong4 Hau6 Daai6 Dou6 Dung1 Soeng6 Wai6 Ho4 Mou4 Wong4 Gung1\n");
+        ShellPrint(TextSelf,"皇后大道中 人民如潮湧\n");
+        ShellPrint(TextSelf,"Wong4 Hau6 Daai6 Dou6 Zung1 Jan4 Man4 Jyu4 Ciu4 Jung2\n");
     }
     else if (StrIsWithSize(Cmd, "Exit", 5)) {
         ShellPrint(TextSelf, "73\n");
@@ -358,9 +424,7 @@ void GlobalShellPoll(void* Self) {
 
     Bool InTitleBar = (
         MouseX >= WinX && MouseX < WinX + WinW &&
-        MouseY >= WinY && MouseY < WinY + TitleBarHeight &&
-        ((KernelGlobalWindowManager.Tail == WinSelf) ||
-        (WMWindowsTitleOverlapping(&KernelGlobalWindowManager, WinSelf, TitleBarHeight, MouseX-WinX, MouseY-WinY) == NULL))
+        MouseY >= WinY && MouseY < WinY + TitleBarHeight
     );
 
     if (GlobalPS2Mouse.Code.ButtonLeft && InTitleBar && !WinSelf->IsDragging) {
@@ -369,6 +433,12 @@ void GlobalShellPoll(void* Self) {
         WinSelf->DragOffsetX = GlobalPS2Mouse.X - (u32)WinSelf->Base.x;
         WinSelf->DragOffsetY = GlobalPS2Mouse.Y - (u32)WinSelf->Base.y;
     }
+
+    if (!GlobalPS2Mouse.Code.ButtonLeft) {
+        WinSelf->IsDragging = 0;
+    }
+
+    if (KernelGlobalWindowManager.Tail!=WinSelf) return;
 
     if (WinSelf->IsDragging && GlobalPS2Mouse.Code.ButtonLeft) {
         s32 NewX = (s32)MouseX - (s32)WinSelf->DragOffsetX;
@@ -381,12 +451,6 @@ void GlobalShellPoll(void* Self) {
         WinSelf->Base.y = (u32)NewY;
     }
 
-    if (!GlobalPS2Mouse.Code.ButtonLeft) {
-        WinSelf->IsDragging = 0;
-    }
-
-    if (KernelGlobalWindowManager.Tail!=WinSelf) return;
-
     if (TopF1To12Key == 7) {
         ShellPrint(TextSelf, RandomString());
         ShellPrint(TextSelf, " ");
@@ -395,7 +459,7 @@ void GlobalShellPoll(void* Self) {
         ShellPrint(TextSelf, "\n");
     }
 
-    if (Get >= 0x80) {
+    if (Get >= 0x80 || Get == 0x00) {
         KeyIsDown = 0;
         OldChar = 0;
         KeyRepeatCounter = 0;
@@ -440,7 +504,7 @@ void GlobalShellDraw(void* Self) {
         WinSelf->Title ? WinSelf->Title : "Window",
         PACK_COLOR(0x00, 0x00, 0x00, 0x00),
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
-        KernelEnglishFonts
+        KernelFonts
     );
     GOPRectFill(
         (u32[2]){(u32)WinSelf->Base.x, (u32)WinSelf->Base.x + (u32)WinSelf->Base.w},
@@ -455,7 +519,7 @@ void GlobalShellDraw(void* Self) {
         TextSelf->Text,
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
         PACK_COLOR(0x00, 0x00, 0x00, 0xFF),
-        KernelEnglishFonts
+        KernelFonts
     );
 }
 

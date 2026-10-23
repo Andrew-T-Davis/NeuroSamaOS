@@ -2,5 +2,5 @@
 
 #include "int.h"
 
-void SpigotE(u64 Count,char* OutBuffer);
-void SpigotPi(u64 Count,char* OutBuffer);
+void SpigotE(u64 Count,u16* OutBuffer);
+void SpigotPi(u64 Count,u16* OutBuffer);

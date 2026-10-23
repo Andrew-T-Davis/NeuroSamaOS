@@ -1,21 +1,22 @@
-MIT License
+NeuroSamaOS Custom License (Modified from the MIT License)
 
 Copyright (c) 2026 Andrew Terrence Davis
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, or distribute copies of the SOURCE CODE, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. OWNERSHIP AND RESTRICTIONS:
+This project is exclusively owned and maintained by the original author. Any external development, code contributions, or Pull Requests (PRs) submitted to this official repository will be declined and rejected. However, users are permitted to fork the repository for personal modifications, submit feedback/suggestions/bug reports via Issues, or submit their forks to the author for consideration as an officially recognized NeuroSamaOS derivative or distribution.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. COMMERCIAL USE AND COMMERCIAL RESALE RESTRICTIONS:
+Any form of commercial use, commercial sale, resale, or distribution of this software (including but not limited to its source code, binaries, derived ISO images, derivative works, or custom distributions) for commercial profit is strictly prohibited. Any form of unauthorized sale or monetization shall be deemed an infringement of this license. Notwithstanding the foregoing, non-commercial, internal corporate use within an enterprise is explicitly permitted and exempted from this restriction.
+
+3. SOURCE CODE REQUIREMENT:
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the SOURCE CODE.
+
+4. BINARY AND ISO IMAGE EXEMPTION:
+Any compiled target code, binary distributions, or final ISO images generated or derived from this software are fully EXEMPT from this requirement. There is no requirement or obligation to include, embed, or enforce any license files or copyright notices within the compiled ISO media or raw binary files.
+
+5. DERIVATIVES AND DISTRIBUTIONS SUBMISSION:
+Any user wishing to submit their forked project to be considered as an official NeuroSamaOS derivative or recognized distribution must contact the original author via email at: andrewtdavis409@gmail.com
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

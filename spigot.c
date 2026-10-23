@@ -5,14 +5,14 @@
 
 extern AllocPool KernelPool;
 
-void SpigotE(u64 Count, char *OutBuffer) {
+void SpigotE(u64 Count, u16 *OutBuffer) {
     u32* Array = AlignedAlloc(&KernelPool, sizeof(u32) * Count, 64);
     MemSet32(Array, 1, sizeof(u32) * Count);
 
     u64 BufferIdx = 0;
     
-    OutBuffer[BufferIdx++] = '2';
-    OutBuffer[BufferIdx++] = '.';
+    OutBuffer[BufferIdx++] = L'2';
+    OutBuffer[BufferIdx++] = L'.';
 
     for (u64 Digit = 0; Digit < Count - 2; Digit++) {
         u32 Carry = 0;
@@ -29,13 +29,13 @@ void SpigotE(u64 Count, char *OutBuffer) {
         Array[0] = Value % 2;
         u32 DigitValue = Value / 2;
 
-        OutBuffer[BufferIdx++] = (char)('0' + DigitValue);
+        OutBuffer[BufferIdx++] = (u16)(L'0' + DigitValue);
     }
 
-    OutBuffer[BufferIdx] = '\0';
+    OutBuffer[BufferIdx] = L'\0';
 }
 
-void SpigotPi(u64 Count, char *OutBuffer) {
+void SpigotPi(u64 Count, u16 *OutBuffer) {
     u32* Array = AlignedAlloc(&KernelPool, sizeof(u32) * Count, 64);
     MemSet32(Array, 2, sizeof(u32) * Count);
 
@@ -63,11 +63,11 @@ void SpigotPi(u64 Count, char *OutBuffer) {
             NineCount++;
         } else if (DigitValue > 9) {
             if (FirstDigit) {
-                OutBuffer[BufferIdx++] = (char)('0' + HeldDigit + 1);
+                OutBuffer[BufferIdx++] = (u16)('0' + HeldDigit + 1);
                 OutBuffer[BufferIdx++] = '.';
                 FirstDigit = 0;
             } else {
-                OutBuffer[BufferIdx++] = (char)('0' + HeldDigit + 1);
+                OutBuffer[BufferIdx++] = (u16)('0' + HeldDigit + 1);
             }
 
             for (u32 N = 0; N < NineCount; N++) {
@@ -78,11 +78,11 @@ void SpigotPi(u64 Count, char *OutBuffer) {
         } else {
             if (Iter > 0) {
                 if (FirstDigit) {
-                    OutBuffer[BufferIdx++] = (char)('0' + HeldDigit);
+                    OutBuffer[BufferIdx++] = (u16)('0' + HeldDigit);
                     OutBuffer[BufferIdx++] = '.';
                     FirstDigit = 0;
                 } else {
-                    OutBuffer[BufferIdx++] = (char)('0' + HeldDigit);
+                    OutBuffer[BufferIdx++] = (u16)('0' + HeldDigit);
                 }
 
                 for (u32 N = 0; N < NineCount; N++) {
@@ -94,6 +94,6 @@ void SpigotPi(u64 Count, char *OutBuffer) {
         }
     }
 
-    OutBuffer[BufferIdx++] = (char)('0' + HeldDigit);
+    OutBuffer[BufferIdx++] = (u16)('0' + HeldDigit);
     OutBuffer[BufferIdx] = '\0';
 }

@@ -53,7 +53,7 @@ extern u64 DSDTAddr;
 
 extern AllocPool KernelPool;
 extern WM KernelGlobalWindowManager;
-extern u32 KernelEnglishFonts[255][19][8];
+extern u16 KernelFonts[65536][19];
 
 static u64 NotepadCount = 0;
 
@@ -64,7 +64,6 @@ void GlobalNotepadExit(void* Self) {
     WMDelWindow(&KernelGlobalWindowManager, NULL, WinSelf->SomeID);
     Free(&KernelPool, WinSelf);
 }
-
 
 static u32 GetRealBufferLength(NotepadText* TextSelf) {
     u32 len = 0;
@@ -204,12 +203,10 @@ void GlobalNotepadPoll(void* Self) {
     u32 WinY = (u32)WinSelf->Base.y;
     u32 WinW = (u32)WinSelf->Base.w;
     u32 TitleBarHeight = 20;
-    
+
     Bool InTitleBar = (
         MouseX >= WinX && MouseX < WinX + WinW &&
-        MouseY >= WinY && MouseY < WinY + TitleBarHeight &&
-        ((KernelGlobalWindowManager.Tail == WinSelf) ||
-        (WMWindowsTitleOverlapping(&KernelGlobalWindowManager, WinSelf, TitleBarHeight, MouseX-WinX, MouseY-WinY) == NULL))
+        MouseY >= WinY && MouseY < WinY + TitleBarHeight
     );
 
     if (GlobalPS2Mouse.Code.ButtonLeft && InTitleBar && !WinSelf->IsDragging) {
@@ -218,6 +215,12 @@ void GlobalNotepadPoll(void* Self) {
         WinSelf->DragOffsetX = GlobalPS2Mouse.X - (u32)WinSelf->Base.x;
         WinSelf->DragOffsetY = GlobalPS2Mouse.Y - (u32)WinSelf->Base.y;
     }
+
+    if (!GlobalPS2Mouse.Code.ButtonLeft) {
+        WinSelf->IsDragging = 0;
+    }
+
+    if (KernelGlobalWindowManager.Tail!=WinSelf) return;
 
     if (WinSelf->IsDragging && GlobalPS2Mouse.Code.ButtonLeft) {
         s32 NewX = (s32)MouseX - (s32)WinSelf->DragOffsetX;
@@ -230,17 +233,11 @@ void GlobalNotepadPoll(void* Self) {
         WinSelf->Base.y = (u32)NewY;
     }
 
-    if (!GlobalPS2Mouse.Code.ButtonLeft) {
-        WinSelf->IsDragging = 0;
-    }
-
     TextSelf->CursorBlinkTimer += (u64)(DeltaMs + 0.5);
     if (TextSelf->CursorBlinkTimer >= 500) {
         TextSelf->CursorBlinkTimer = 0;
         TextSelf->CursorVisible = !TextSelf->CursorVisible;
     }
-
-    if (KernelGlobalWindowManager.Tail != WinSelf) return;
 
     if (Escape == 1) {
         TextSelf->IsCommandMode = !TextSelf->IsCommandMode;
@@ -291,7 +288,7 @@ void GlobalNotepadPoll(void* Self) {
                         .CallFunc=RunJIT,
                         .DelFunc=NULL,
                         .CoreID=(u8)rdrand(),
-                        .Name="RunningJIT Notepad",
+                        .Name=L"RunningJIT Notepad",
                         .NextWaitNs=0,
                         .Target=NULL,
                     }, 0);
@@ -524,7 +521,7 @@ void GlobalNotepadDraw(void* Self) {
         title_buf,
         PACK_COLOR(0x0000, 0x0000, 0x0000, 0x0000),
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
-        KernelEnglishFonts
+        KernelFonts
     );
 
     u32 EditorHeight = (u32)WinSelf->Base.h - 38;
@@ -566,7 +563,7 @@ void GlobalNotepadDraw(void* Self) {
             line_num_str,
             PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
             PACK_COLOR(0x88, 0x88, 0x88, 0xFF),
-            KernelEnglishFonts
+            KernelFonts
         );
     }
 
@@ -637,7 +634,7 @@ void GlobalNotepadDraw(void* Self) {
         display_buf,
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
         PACK_COLOR(0x00, 0x00, 0x00, 0xFF),
-        KernelEnglishFonts
+        KernelFonts
     );
 
     if (TextSelf->CursorVisible || TextSelf->IsCommandMode) {
@@ -663,7 +660,7 @@ void GlobalNotepadDraw(void* Self) {
     );
 
     char status_str[64];
-    u32 char_count = GetRealBufferLength(TextSelf);
+    u32 u16_count = GetRealBufferLength(TextSelf);
     
     const char s_ln[] = " Ln: ";
     u32 idx = 0;
@@ -686,7 +683,7 @@ void GlobalNotepadDraw(void* Self) {
     const char s_len[] = " | Total: ";
     for (u32 i = 0; s_len[i]; i++) status_str[idx++] = s_len[i];
 
-    num = char_count; t = 0;
+    num = u16_count; t = 0;
     if (num == 0) tmp[t++] = '0';
     while (num > 0 && t < 7) { tmp[t++] = '0' + (num % 10); num /= 10; }
     while (t > 0) status_str[idx++] = tmp[--t];
@@ -701,7 +698,7 @@ void GlobalNotepadDraw(void* Self) {
         status_str,
         PACK_COLOR(0xDD, 0xDD, 0xDD, 0xFF),
         PACK_COLOR(0x33, 0x33, 0x33, 0xFF),
-        KernelEnglishFonts
+        KernelFonts
     );
 }
 

@@ -38,14 +38,14 @@ void IDTCloseError(void) {
 }
 
 __attribute__((always_inline)) static void outb_hex64(u64 val) {
-    const char hex[] = "0123456789ABCDEF";
+    const u16 hex[] = L"0123456789ABCDEF";
     for (int i = 60; i >= 0; i -= 4) {
         outb(0x3F8, (const u8)hex[(val >> i) & 0xF]);
     }
 }
 
-__attribute__((always_inline)) static void outb_str(const char* s) {
-    while (*s) outb(0x3F8, (const u8)(*s++));
+__attribute__((always_inline)) static void outb_str(const u16* s) {
+    while (*s) outb(0x3F8, (const u8)(*((u8*)s++)));
 }
 
 u8 get_instruction_length(u64 rip) {
@@ -184,7 +184,7 @@ decode_modrm:
 
 void handle_exception_fast(u64 vector, u64 error_code, u64 *rip, u64 *cs, u64 *rflags) {
     if (InExceptionHandler) {
-        outb_str("\nRECURSIVE EXCEPTION HALT,I am Sorry\n");
+        outb_str(L"\nRECURSIVE EXCEPTION HALT,I am Sorry\n");
         while(1)__asm__ volatile("cli\n\t""hlt\n\t"); 
     }
     InExceptionHandler = 1;
@@ -195,35 +195,35 @@ void handle_exception_fast(u64 vector, u64 error_code, u64 *rip, u64 *cs, u64 *r
     __asm__ volatile("movq %%cr2,%0 \n\t" : "=r"(Cr2) : : "memory");
     __asm__ volatile("movq %%cr3,%0 \n\t" : "=r"(Cr3) : : "memory");
 
-    outb_str("\nEXC V=");
+    outb_str(L"\nEXC V=");
     outb_hex64(vector);
-    outb_str(" E=");
+    outb_str(L" E=");
     outb_hex64(error_code);
-    outb_str(" RIP=");
+    outb_str(L" RIP=");
     outb_hex64(*rip);
-    outb_str(" CS=");
+    outb_str(L" CS=");
     outb_hex64(*cs);
-    outb_str(" CR2=");
+    outb_str(L" CR2=");
     outb_hex64(Cr2);
-    outb_str(" CR3=");
+    outb_str(L" CR3=");
     outb_hex64(Cr3);
-    outb_str(" RFLAGS=");
+    outb_str(L" RFLAGS=");
     outb_hex64(*rflags);
-    outb_str("\n");
+    outb_str(L"\n");
 
     if (vector == 8) {
-        outb_str("DF HALT,I am Sorry\n");
+        outb_str(L"DF HALT,I am Sorry\n");
         while(1) { __asm__ volatile("cli\n\t""hlt\n\t"); }
     }
     if (*rip != 0) {
         u8 len = get_instruction_length(*rip);
         *rip += len;
     } else {
-        outb_str("NULL RIP HALT,I am Sorry\n");
+        outb_str(L"NULL RIP HALT,I am Sorry\n");
         while(1) { __asm__ volatile("cli\n\t""hlt\n\t"); }
     }
 
-    outb_str("Skip Error Code. Your Code Is Shit.\n");
+    outb_str(L"Skip Error Code. Your Code Is Shit.\n");
     
     InExceptionHandler = 0;
 }
@@ -332,7 +332,7 @@ void SetIDTEntry(u32 n, u64 handler, u16 selector, u8 type_attr) {
 
 void InitIDT() {
     __asm__ volatile("cli");
-    outb_str("Set Entry\n");
+    outb_str(L"Set Entry\n");
     for (u32 i = 0; i < 256; i++) {
         SetIDTEntry(i, (u64)default_hardware_interrupt_handler, 0x08, 0x8E);
     }

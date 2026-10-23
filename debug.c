@@ -1,6 +1,5 @@
 #pragma clang optimize off
 #include "debug.h"
-#include "str.h"
 #include "int.h"
 #include "port.h"
 
@@ -25,14 +24,6 @@ void DebugChar(const char C) {
 void DebugStr(const char *S){
     if (!S) return;
     while (*S) DebugChar(*S++);
-}
-
-void DebugU64Bit(u64 LLU){
-    char buf[65];
-    MemSet(buf, '0', 64);
-    Bit64Str(LLU, buf);
-    buf[64]='\0';
-    DebugStr(buf);
 }
 
 void DebugU64(u64 LLU) {

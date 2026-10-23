@@ -277,8 +277,8 @@ HDAudio* HDAudioInit(){
     DebugStr("After Wake Up,Set 1 GCTL.rwFlushControl:");DebugU32(NewHDAudio->Regs->GCTL.rwFlushControl);DebugChar('\n');
     DebugStr("GCTL:");DebugU32(NewHDAudio->Regs->GCTL.U);DebugChar('\n');
     if (NewHDAudio->Regs->STATESTS.U == 0) NewHDAudio->Regs->STATESTS.U = 0xFFFF;
-    DebugStr("STATESTS:");DebugU64Bit(NewHDAudio->Regs->STATESTS.U);DebugChar('\n');
-    DebugStr("WAKEEN:");DebugU64Bit(NewHDAudio->Regs->WAKEEN.U);DebugChar('\n');
+    DebugStr("STATESTS:");DebugU64(NewHDAudio->Regs->STATESTS.U);DebugChar('\n');
+    DebugStr("WAKEEN:");DebugU64(NewHDAudio->Regs->WAKEEN.U);DebugChar('\n');
     DebugStr("GCAP:\n");
     DebugStr("\t.roOSSCount:");DebugU16(NewHDAudio->Regs->GCAP.roOSSCount);DebugChar('\n');
     DebugStr("\t.roISSCount:");DebugU16(NewHDAudio->Regs->GCAP.roISSCount);DebugChar('\n');

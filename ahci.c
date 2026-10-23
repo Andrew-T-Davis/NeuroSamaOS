@@ -527,7 +527,7 @@ AHCIController* InitAHCI() {
         DebugStr("PRDBC: 0x"); DebugU32(slot_dw[1]); DebugChar('\n');
         DebugStr("Model Name: ");
         for (u64 i = 27; i < 47; i++) {
-            u16 val = ((u16*)BufferTmp)[i];
+            char val = ((char*)BufferTmp)[i];
             char c1 = (char)(val >> 8);
             char c2 = (char)(val & 0xFF);
             if (c1 >= 0x20 && c1 <= 0x7E) DebugChar(c1);

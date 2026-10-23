@@ -11,7 +11,7 @@ void PingPong(void **Ping, void **Pong){
     *Ping=Temp;
 }
 
-void StrAdd(char* Add,const char* S,Size64 Size){
+void StrAdd(u16* Add,const char* S,Size64 Size){
     u64 start=0;
     while (Add[start]!='\0') start++;
 
@@ -206,7 +206,7 @@ void MemSet64(void* D, const u64 S, Size64 Size) {
     }
 }
 
-void Bit64Str(u64 N,char* Buf){
+void Bit64Str(u64 N,u16* Buf){
     #pragma clang loop unroll(enable)
     for (s64 idx=63;idx>=0;idx--){
         Buf[63 - idx] = ((N >> idx) & 1) + 48;
@@ -485,7 +485,7 @@ u64 StrToU64(char* S, Bool DecOrHex) {
     return neg ? (val | 0x8000000000000000ULL) : val;
 }
 
-static f64 ParseFraction(const char** S) {
+static f64 ParseFraction(const u16** S) {
     f64 frac = 0.0;
     f64 divisor = 10.0;
     
@@ -497,7 +497,7 @@ static f64 ParseFraction(const char** S) {
     return frac;
 }
 
-static f64 ParseExponent(const char** S) {
+static f64 ParseExponent(const u16** S) {
     if (**S != 'e' && **S != 'E') return 1.0;
     (*S)++;
     
@@ -544,11 +544,11 @@ f32 StrToF32(char* S) {
     
     if (*S == '.') {
         S++;
-        result += ParseFraction((const char**)&S);
+        result += ParseFraction((const u16**)&S);
     }
     
     if (*S == 'e' || *S == 'E') {
-        result *= ParseExponent((const char**)&S);
+        result *= ParseExponent((const u16**)&S);
     }
     
     if (neg) result = -result;
@@ -577,11 +577,11 @@ f64 StrToF64(char* S) {
     
     if (*S == '.') {
         S++;
-        result += ParseFraction((const char**)&S);
+        result += ParseFraction((const u16**)&S);
     }
     
     if (*S == 'e' || *S == 'E') {
-        result *= ParseExponent((const char**)&S);
+        result *= ParseExponent((const u16**)&S);
     }
     
     if (neg) result = -result;
@@ -645,9 +645,9 @@ f80 StrToF80(char* S) {
     return result;
 }
 
-void Reverse(char* start, char* end) {
+void Reverse(u16* start, u16* end) {
     while (start < end) {
-        char tmp = *start;
+        u16 tmp = *start;
         *start = *end;
         *end = tmp;
         start++;

@@ -16,7 +16,7 @@ typedef struct{
     void* (*DelFunc)(void* ArgList);
     void *Arg;
     Bool Active;
-    const char* Name;
+    const u16* Name;
     u64 NextWaitNs;
     u64 IntervalNs;
     u64 CoreID;
