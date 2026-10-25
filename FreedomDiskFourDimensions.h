@@ -92,10 +92,10 @@ char* GetFDFDFolderTableName(FDFDFolderTable* Data, u8 Idx);
 char* GetFDFDFileTableName(FDFDFileTable* Data, u8 Idx);
 u8* GetFDFDFolderTableBuffer(FDFDFolderTable* Data, u8 Idx);
 u8* GetFDFDFileTableBuffer(FDFDFileTable* Data, u8 Idx);
-void NewFile(FDFDFileTable Table, u8 Idx, u8* Data);
-void NewFolder(FDFDFolderTable Table, u8 Idx, u8* Data);
-u8* ReadFile(u8 Idx, char* Name);
+void NewFDDFFile(FDFDFileTable Table, u8 Idx, u8* Data);
+void NewFDFDFolder(FDFDFolderTable Table, u8 Idx, u8* Data);
+u8* ReadFDFDFile(u8 Idx, char* Name);
 void InitDiskToFDFD(u8 Idx);
 
-int DelFile(u8 Idx, const char* Name);
-int DelFolder(u8 Idx, const char* Name);
+int DelFDFDFile(u8 Idx, const char* Name);
+int DelFDFDFolder(u8 Idx, const char* Name);

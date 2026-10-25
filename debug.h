@@ -2,6 +2,9 @@
 
 #include "int.h"
 
+extern char ScreenDebug[1501];
+extern u64 ScreenDebugCurX;
+
 void DebugInit(void);
 
 void DebugChar(const char C);

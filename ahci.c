@@ -365,6 +365,18 @@ AHCIController* InitAHCI() {
         Ctrl->Regs->PortRegisters[Idx].PortInterruptStatus.U = 0xFFFFFFFF;
         __asm__ volatile("mfence" ::: "memory");
 
+        SystemBusySleepMs(10);
+        
+        u32 ssts_check = Ctrl->Regs->PortRegisters[Idx].PortSerialATAStatus.U;
+        if ((ssts_check & 0x0F) == 0) {
+            SystemBusySleepMs(5);
+            ssts_check = Ctrl->Regs->PortRegisters[Idx].PortSerialATAStatus.U;
+            if ((ssts_check & 0x0F) == 0) {
+                DebugStr(" Port empty, skip.\n");
+                continue;
+            }
+        }
+
         timeout = 100727;
         u32 ssts = 0;
         u32 det = 0, ipm = 0, spd = 0;
@@ -526,12 +538,19 @@ AHCIController* InitAHCI() {
         }
         DebugStr("PRDBC: 0x"); DebugU32(slot_dw[1]); DebugChar('\n');
         DebugStr("Model Name: ");
+        u16* IdWords = (u16*)BufferTmp;
         for (u64 i = 27; i < 47; i++) {
-            char val = ((char*)BufferTmp)[i];
-            char c1 = (char)(val >> 8);
-            char c2 = (char)(val & 0xFF);
-            if (c1 >= 0x20 && c1 <= 0x7E) DebugChar(c1);
-            if (c2 >= 0x20 && c2 <= 0x7E) DebugChar(c2);
+            u16 Word = IdWords[i];
+            
+            char c1 = (char)(Word >> 8);
+            char c2 = (char)(Word & 0xFF);
+
+            if (c1 >= 0x20 && c1 <= 0x7E) {
+                DebugChar(c1);
+            }
+            if (c2 >= 0x20 && c2 <= 0x7E) {
+                DebugChar(c2);
+            }
         }
         DebugChar('\n');
         DebugStr("--- IDENTIFY Complete ---\n");
@@ -606,6 +625,8 @@ int AHCISendMessage(AHCIController* controller, u8 port_idx, u8 slot, u64 lba, u
     }
     if (spin >= 1000000) return -1;
 
+    u64 start_time = SystemGetTimeUs();
+
     port->PortCommandIssue.rw1CommandsIssued = (1 << slot);
 
     while (1) {
@@ -617,6 +638,13 @@ int AHCISendMessage(AHCIController* controller, u8 port_idx, u8 slot, u64 lba, u
             DebugStr("port->PortInterruptStatus.rwcTaskFileErrorStatus == 1\n");
             return -1;
         }
+
+        if (SystemGetTimeUs() - start_time > 500000) {
+            DebugStr("[AHCI] Command Timeout! Hardware hung.\n");
+            return -1;
+        }
+
+        __asm__ volatile("pause");
     }
 
     controller->PortFISSlot[port_idx] = (controller->PortFISSlot[port_idx] + 1) % 32;

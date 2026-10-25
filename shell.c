@@ -504,7 +504,8 @@ void GlobalShellDraw(void* Self) {
         WinSelf->Title ? WinSelf->Title : "Window",
         PACK_COLOR(0x00, 0x00, 0x00, 0x00),
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
-        KernelFonts
+        KernelFonts,
+        0
     );
     GOPRectFill(
         (u32[2]){(u32)WinSelf->Base.x, (u32)WinSelf->Base.x + (u32)WinSelf->Base.w},
@@ -519,7 +520,8 @@ void GlobalShellDraw(void* Self) {
         TextSelf->Text,
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
         PACK_COLOR(0x00, 0x00, 0x00, 0xFF),
-        KernelFonts
+        KernelFonts,
+        0
     );
 }
 

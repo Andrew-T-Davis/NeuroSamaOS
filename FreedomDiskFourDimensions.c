@@ -274,23 +274,23 @@ u8* GetFDFDFileTableBuffer(FDFDFileTable* Data, u8 Idx) {
     return GetTableBuffer(Idx, Data->SizeOfData, Data->OffSetOfSector);
 }
 
-void NewFile(FDFDFileTable Table, u8 Idx, u8* Data) {
+void NewFDFDFile(FDFDFileTable Table, u8 Idx, u8* Data) {
     AppendTableEntry(&Table, sizeof(FDFDFileTable), Idx, Data, Table.SectorCount);
 }
 
-void NewFolder(FDFDFolderTable Table, u8 Idx, u8* Data) {
+void NewFDFDFolder(FDFDFolderTable Table, u8 Idx, u8* Data) {
     AppendTableEntry(&Table, sizeof(FDFDFolderTable), Idx, Data, Table.SectorCount);
 }
 
-int DelFile(u8 Idx, const char* Name) {
+int DelFDFDFile(u8 Idx, const char* Name) {
     return DeleteTableEntry(Idx, Name, 0x00);
 }
 
-int DelFolder(u8 Idx, const char* Name) {
+int DelFDFDFolder(u8 Idx, const char* Name) {
     return DeleteTableEntry(Idx, Name, 0x01);
 }
 
-u8* ReadFile(u8 Idx, char* Name) {
+u8* ReadFDFDFile(u8 Idx, char* Name) {
     if (!Name) return NULL;
 
     u64 SectorCount = 0;

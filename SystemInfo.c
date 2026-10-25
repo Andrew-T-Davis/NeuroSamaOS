@@ -31,9 +31,7 @@ void GlobalSystemInfoPoll(void* Self) {
 
     Bool InTitleBar = (
         MouseX >= WinX && MouseX < WinX + WinW &&
-        MouseY >= WinY && MouseY < WinY + TitleBarHeight &&
-        ((KernelGlobalWindowManager.Tail == WinSelf) ||
-        (WMWindowsTitleOverlapping(&KernelGlobalWindowManager, WinSelf, TitleBarHeight, MouseX-WinX, MouseY-WinY) == NULL))
+        MouseY >= WinY && MouseY < WinY + TitleBarHeight
     );
 
     if (GlobalPS2Mouse.Code.ButtonLeft && InTitleBar && !WinSelf->IsDragging) {
@@ -43,7 +41,13 @@ void GlobalSystemInfoPoll(void* Self) {
         WinSelf->DragOffsetY = GlobalPS2Mouse.Y - (u32)WinSelf->Base.y;
     }
 
-    if (WinSelf->IsDragging && GlobalPS2Mouse.Code.ButtonLeft) {
+    if (!GlobalPS2Mouse.Code.ButtonLeft) {
+        WinSelf->IsDragging = 0;
+    }
+
+    if (KernelGlobalWindowManager.Tail!=WinSelf) return;
+
+        if (WinSelf->IsDragging && GlobalPS2Mouse.Code.ButtonLeft) {
         s32 NewX = (s32)MouseX - (s32)WinSelf->DragOffsetX;
         s32 NewY = (s32)MouseY - (s32)WinSelf->DragOffsetY;
         
@@ -52,10 +56,6 @@ void GlobalSystemInfoPoll(void* Self) {
         
         WinSelf->Base.x = (u32)NewX;
         WinSelf->Base.y = (u32)NewY;
-    }
-
-    if (!GlobalPS2Mouse.Code.ButtonLeft) {
-        WinSelf->IsDragging = 0;
     }
 }
 
@@ -74,7 +74,8 @@ void GlobalSystemInfoDraw(void* Self) {
         WinSelf->Title ? WinSelf->Title : "Window",
         PACK_COLOR(0x00, 0x00, 0x00, 0x00),
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
-        KernelFonts
+        KernelFonts,
+        0
     );
     GOPRectFill(
         (u32[2]){(u32)WinSelf->Base.x, (u32)WinSelf->Base.x + (u32)WinSelf->Base.w},
@@ -86,19 +87,23 @@ void GlobalSystemInfoDraw(void* Self) {
         (u32)WinSelf->Base.y + 20 + 0,
         (u32)WinSelf->Base.w,
         (u32)WinSelf->Base.h,
-        "SystemInfo:\n"
-                "\tVerison / Build data: " BUILD_DATE
+        "System info:\n"
+                    "\tVersion & Build data: " BUILD_DATE "\n"
+                    "\tRepo *.c count: " "43" "\n"
+                    "\tRepo *.h count: " "53" "\n"
+                    "\tRepo *.s count: " "02" "\n"
         ,
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
         PACK_COLOR(0x00, 0x00, 0x00, 0xFF),
-        KernelFonts
+        KernelFonts,
+        0
     );
 }
 
 void NewSystemInfoWindow(void){
     Window* NewSystemInfo = Alloc(&KernelPool, sizeof(Window));
     if (!NewSystemInfo) return;
-    NewSystemInfo->SomeID = (0x535953494e464f00ULL+SystemInfoCount);
+    NewSystemInfo->SomeID = (0x535953494E464F00ULL+SystemInfoCount);
     NewSystemInfo->Base.Exit = GlobalSystemInfoExit;
     NewSystemInfo->Base.Visible = 1;
     NewSystemInfo->Base.x = 100;

@@ -1,4 +1,3 @@
-#include "FreedomDiskFourDimensions.h"
 #include "RandomSomething.h"
 #include "ahci.h"
 #include "efi.h"
@@ -66,6 +65,7 @@ u64 FADTAddr=0;
 u64 DSDTAddr=0;
 u64 HPETAddr=0;
 u64 MADTAddr=0;
+u64 DMARAddr=0;
 u64 AcpiSize=0;
 u64 APCount=0;
 u32 TmpCoreWakeID=0;
@@ -113,8 +113,11 @@ u64* BuildDynamicPageTable(
     u64 *RsvdStartAddrList, u64 *RsvdEndAddrList, u64 RsvdAddrListCount
 ) {
     DebugStr("PhysMem:");DebugU64(PhysMem);DebugChar('\n');
+    DebugStr("MaxPhysMem");DebugU64(MaxPhysMem);DebugChar('\n');
     EFI_PHYSICAL_ADDRESS alloc_addr;
     int Use_l5 = IsLa57Supported();
+
+    wrmsr(0x277, 0x0000000000010006ULL);
 
     alloc_addr = 0xFFFFFFFFFFFFFFFF;
     if (bs->AllocatePages(AllocateMaxAddress, EfiRuntimeServicesData, 1, &alloc_addr) != EFI_SUCCESS) return 0;
@@ -157,42 +160,15 @@ u64* BuildDynamicPageTable(
     pt_4k[0]=0x000;
     pd_low[0] = ((u64)pt_4k & ~0xFFFULL) | 0x003;
 
-    u64 code_start_aligned = (CodeStart / 0x200000) * 0x200000;
-    u64 code_end_aligned = ((CodeEnd + 0x1FFFFF) / 0x200000) * 0x200000;
-
     for (u64 i = 1; i < 512; i++) {
         u64 phys = i * 0x200000;
-        if (phys >= code_start_aligned && phys < code_end_aligned) {
-            pd_low[i] = phys | 0x183;
-        } else {
-            pd_low[i] = phys | 0x193;
-        }
+        pd_low[i] = phys | 0x183;
     }
 
-    u64 max_1gb_pages = 0;
-    u64 result_low, result_high;
-
-    const u64 tmp0=0;
-    const u64 tmp1=0x3FFFFFFFULL;
-    const u64 tmp2=0x40000000ULL;
-    __asm__ volatile(
-        "movq %2, %%rax\n\t"
-        "movq %3, %%rdx\n\t"
-        "addq %4, %%rax\n\t"
-        "adcq $0, %%rdx\n\t"
-        "movq %5, %%rcx\n\t"
-        "divq %%rcx\n\t"
-        : "=a"(result_low), "=d"(result_high)
-        : "m"(MaxPhysMem), "m"(tmp0), "m"(tmp1), "m"(tmp2)
-        : "rcx"
-    );
-
-    u64 max_1gb_pages_limit = Use_l5 ? 262144 : 512;
-    max_1gb_pages = (result_low > max_1gb_pages_limit) ? max_1gb_pages_limit : result_low;
+    u64 max_1gb_pages = Use_l5 ? 262144 : 512;
 
     u64 code_start_1gb = (CodeStart / 0x40000000) * 0x40000000;
     u64 code_end_1gb = ((CodeEnd + 0x3FFFFFFF) / 0x40000000) * 0x40000000;
-    u64 RsvdIdx=0;
 
     for (u64 i = 1; i < max_1gb_pages; i++) {
         u64 phys = i * 0x40000000ULL;
@@ -224,22 +200,37 @@ u64* BuildDynamicPageTable(
         }
         u64* cur_pdpt = (u64*)(active_pml4[pml4_idx] & ~0xFFFULL);
 
-        u64 RsvdAlignedStartAddr=0;
-        u64 RsvdAlignedEndAddr=0;
-        if (RsvdAddrListCount!=0){
-            RsvdAlignedStartAddr=(RsvdStartAddrList[RsvdIdx] / 0x40000000) * 0x40000000;
-            RsvdAlignedEndAddr=((RsvdEndAddrList[RsvdIdx] + 0x3FFFFFFF) / 0x40000000) * 0x40000000;
+        Bool IsReserved = 0;
+        for (u64 r = 0; r < RsvdAddrListCount; r++) {
+            u64 RsvdAlignedStartAddr = (RsvdStartAddrList[r] / 0x40000000) * 0x40000000;
+            u64 RsvdAlignedEndAddr   = ((RsvdEndAddrList[r] + 0x3FFFFFFF) / 0x40000000) * 0x40000000;
+            if (phys >= RsvdAlignedStartAddr && phys < RsvdAlignedEndAddr) {
+                IsReserved = 1;
+                break;
+            }
         }
-        RsvdIdx++;
-        
+
         if (phys >= code_start_1gb && phys < code_end_1gb) {
             cur_pdpt[pdpt_idx] = phys | 0x183;
         } else if (phys >= 0xFC000000 && phys <= 0x100000000){
-            cur_pdpt[pdpt_idx] = phys | 0x183;
-        } else if (phys >= RsvdAlignedStartAddr && phys < RsvdAlignedEndAddr && RsvdAddrListCount!=0){
-            cur_pdpt[pdpt_idx] = phys | 0x180;
-        } else {
             cur_pdpt[pdpt_idx] = phys | 0x193;
+        } else if (
+            (
+                phys >= (((u64)GopBack) & ~((PAGE_SIZE_1GB) - 1)) && 
+                phys < ((((u64)GopBack+GopMode.FrameBufferSize) + (PAGE_SIZE_1GB) - 1) & ~((PAGE_SIZE_1GB) - 1))
+            ) ||
+            (
+                phys >= (((u64)GopOut) & ~((PAGE_SIZE_1GB) - 1)) && 
+                phys < ((((u64)GopOut+GopMode.FrameBufferSize) + (PAGE_SIZE_1GB) - 1) & ~((PAGE_SIZE_1GB) - 1))
+            )
+        ){
+            cur_pdpt[pdpt_idx] = phys | 0x18B;
+        } else if (IsReserved){
+            cur_pdpt[pdpt_idx] = phys | 0x180;
+        } else if (phys >= (PhysMem+0xE0000)){
+            cur_pdpt[pdpt_idx] = phys | 0x193;
+        } else {
+            cur_pdpt[pdpt_idx] = phys | 0x183;
         }
     }
     Cr3=(u64)root_table;
@@ -492,6 +483,7 @@ u32 SelectResolution(EFI_SYSTEM_TABLE* sys) {
         return 0;
     }
     
+    Start:
     sys->ConOut->ClearScreen(sys->ConOut);
     sys->ConOut->SetCursorPosition(sys->ConOut, 0, 0);
     sys->ConOut->OutputString(sys->ConOut, L"Available Resolutions:\n\r\n\r");
@@ -511,7 +503,7 @@ u32 SelectResolution(EFI_SYSTEM_TABLE* sys) {
     u16 InputBuffer[16];
     u32 InputLength = 0;
     EFI_INPUT_KEY Key;
-    
+
     while (1) {
         u64 EventIndex;
         sys->BootServices->WaitForEvent(1, &sys->ConIn->WaitForKey, &EventIndex);
@@ -543,7 +535,7 @@ u32 SelectResolution(EFI_SYSTEM_TABLE* sys) {
     }
     
     if (InputLength == 0) {
-        return 0;
+        goto Start;
     }
     
     u32 Selection = 0;
@@ -620,6 +612,15 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
     u32 SelectedMode = SelectResolution(sys);
 
     EFI_STATUS Status = Gop->SetMode(Gop, SelectedMode);
+
+    while (1){
+        if (Gop->Mode->Mode != SelectedMode) {
+            u32 CurrentMode = Gop->Mode->Mode;
+            Status = Gop->SetMode(Gop, CurrentMode); 
+            Status = Gop->SetMode(Gop, SelectedMode);
+        }
+        break;
+    }
     DebugStr("SetMode Status: ");
     DebugU64(Status);
     DebugChar('\n');
@@ -736,7 +737,7 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
         }
     }
 
-    GetAcpiAddrUEFI(bs, &AcpiSize, &FADTAddr, &DSDTAddr, &HPETAddr, &MADTAddr);
+    GetAcpiAddrUEFI(bs, &AcpiSize, &FADTAddr, &DSDTAddr, &HPETAddr, &MADTAddr, &DMARAddr);
     SetHPETMMIO(HPETAddr);
 
     UINTN MemoryMapSize = 0;
@@ -936,14 +937,16 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
     LoadDynamicPageTable(pml5);
     __asm__("sfence");
     DebugStr("Init Stack");
-    u64 StackTop = (u64)(&KernelStack[0]) + KERNEL_STACK_SIZE;
-    DebugStr("Stack at: "); DebugU64((u64)(&KernelStack[0])); DebugChar('\n');
-    DebugStr("StackTop at: "); DebugU64(StackTop); DebugChar('\n');
-    __asm__ volatile(
-        "movq %0, %%rsp\n\t"
-        "xorq %%rbp, %%rbp\n\t"
-        :: "r"(StackTop) : "memory"
-    );
+    u64 CoreCount = GetActualCoreCount();
+    if (CoreCount > 288) CoreCount = 288;
+    if (CoreCount == 0) CoreCount = 1;
+    u64 PerCoreStack = (KERNEL_STACK_SIZE / CoreCount) & ~0xFULL;
+    if (PerCoreStack < 0x10000) PerCoreStack = 0x10000;
+
+    for (u64 i = 0; i < CoreCount; i++) {
+        APStackSPs[i] = (u64)KernelStack + (i + 1) * PerCoreStack;
+        APStackBPs[i] = (u64)KernelStack + (i + 1) * PerCoreStack;
+    }
     DebugStr("AllocStack.\n");
     GopBack = (u32*)(u64)AlignedAlloc(&KernelPool, GopInfo.PixelsPerScanLine * GopInfo.VerticalResolution * sizeof(u32), 64);
 
@@ -985,22 +988,6 @@ void* PollWMTask(void* Rsvd){
     return Rsvd;
 }
 
-void InitStacks() {
-    u64 CoreCount = GetActualCoreCount();
-    u64 PerCoreStack = KERNEL_STACK_SIZE / CoreCount;
-    
-    for (u64 i = 0; i < CoreCount; i++) {
-        APStackSPs[i] = (u64)KernelStack + (i + 1) * PerCoreStack;
-        APStackBPs[i] = (u64)KernelStack + (i + 1) * PerCoreStack;
-    }
-    
-    __asm__ volatile(
-        "movq %0, %%rsp\n\t"
-        "movq %1, %%rbp\n\t"
-        :: "r"(APStackSPs[0]), "r"(APStackBPs[0]) : "memory"
-    );
-}
-
 __attribute__((naked)) void GlobalCoreInit(){
     __asm__ volatile(
         ".code16gcc\n\t"
@@ -1038,6 +1025,7 @@ __attribute__((naked)) void GlobalCoreInit(){
 
         ".code32\n\t"
         "1:\n\t"
+        "cli\n\t"
         "movw $0x10, %ax\n\t"
         "movw %ax, %ds\n\t"
         "movw %ax, %es\n\t"
@@ -1057,6 +1045,11 @@ __attribute__((naked)) void GlobalCoreInit(){
         "orl $(1 << 8), %eax\n\t"
         "wrmsr\n\t"
 
+        "movl $0x277, %ecx\n\t"
+        "movl $0x00000000, %edx\n\t"
+        "movl $0x00010006, %eax\n\t"
+        "wrmsr\n\t"
+
         "movl (Cr3), %eax\n\t"
         "movl %eax, %cr3\n\t"
 
@@ -1072,6 +1065,7 @@ __attribute__((naked)) void GlobalCoreInit(){
 
         ".code64\n\t"
         "2:\n\t"
+        "cli\n\t"
         "movw $0x10, %ax\n\t"
         "movw %ax, %ds\n\t"
         "movw %ax, %es\n\t"
@@ -1123,117 +1117,177 @@ void SendSIPI(u64 ApicId, u64 TrampolineVector) {
     Bool is_x2apic = ((apic_base & (1ULL << 11)) != 0) && ((apic_base & (1ULL << 10)) != 0);
 
     if (is_x2apic) {
-        wrmsr(0x830, (ApicId << 32) | 0x00004D00ULL);
+        while (rdmsr(0x830) & (1ULL << 12)) { __asm__("pause"); }
+        
+        wrmsr(0x830, (ApicId << 32) | 0x00004500ULL);
+        
+        while (rdmsr(0x830) & (1ULL << 12)) { __asm__("pause"); }
+        
         SystemBusySleepMs(10);
         
-        wrmsr(0x830, (ApicId << 32) | 0x00004E00ULL | Vector);
+        wrmsr(0x830, (ApicId << 32) | 0x00004600ULL | Vector);
+        while (rdmsr(0x830) & (1ULL << 12)) { __asm__("pause"); }
+        
         SystemBusySleepUs(200);
-
-        wrmsr(0x830, (ApicId << 32) | 0x00004E00ULL | Vector);
-        SystemBusySleepUs(200);
+        
+        wrmsr(0x830, (ApicId << 32) | 0x00004600ULL | Vector);
+        while (rdmsr(0x830) & (1ULL << 12)) { __asm__("pause"); }
+        
     } else {
         volatile u32* IcrLow  = (volatile u32*)0xFEE00300;
         volatile u32* IcrHigh = (volatile u32*)0xFEE00310;
         
-        while (*IcrLow & (1 << 12)) __asm__("pause" : : : "memory");
+        while (*IcrLow & (1ULL << 12)) { __asm__("pause"); }
+        
         *IcrHigh = (u32)((ApicId & 0xFF) << 24);
-        __asm__ volatile("" ::: "memory");
         *IcrLow  = 0x00004500;
+        __asm__ volatile("mfence" ::: "memory");
+        
+        while (*IcrLow & (1ULL << 12)) { __asm__("pause"); }
         SystemBusySleepMs(10);
         
-        while (*IcrLow & (1 << 12)) __asm__("pause" : : : "memory");
+        while (*IcrLow & (1ULL << 12)) { __asm__("pause"); }
         *IcrHigh = (u32)((ApicId & 0xFF) << 24);
-        __asm__ volatile("" ::: "memory");
         *IcrLow  = 0x00004600 | Vector;
+        __asm__ volatile("mfence" ::: "memory");
+        
+        while (*IcrLow & (1ULL << 12)) { __asm__("pause"); }
         SystemBusySleepUs(200);
-
-        while (*IcrLow & (1 << 12)) __asm__("pause" : : : "memory");
+        
+        while (*IcrLow & (1ULL << 12)) { __asm__("pause"); }
         *IcrHigh = (u32)((ApicId & 0xFF) << 24);
-        __asm__ volatile("" ::: "memory");
         *IcrLow  = 0x00004600 | Vector;
-        SystemBusySleepUs(200);
+        __asm__ volatile("mfence" ::: "memory");
+        
+        while (*IcrLow & (1ULL << 12)) { __asm__("pause"); }
     }
 }
 
 Bool IsX2ApicSupported(void) {
     u32 eax, ebx, ecx, edx;
-    __asm__ volatile("cpuid"
-                     : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
-                     : "a"(1));
-    return (ecx & (1 << 21)) != 0;
+    __asm__ volatile("cpuid" : "=a"(eax),"=b"(ebx),"=c"(ecx),"=d"(edx) : "a"(1));
+    if (!(ecx & (1 << 21))) return false;
+
+    u64 base = rdmsr(0x1B);
+    if (!(base & (1ULL << 8))) return false;
+    if (base & (1ULL << 11)) return true;
+    return true;
 }
 
-void GlobalAMPMain(){
+#pragma clang optimize off
+__attribute__((target("no-avx,no-avx2")))
+void GlobalAMPMain(void) {
     __asm__ volatile("sti");
-    APAPICIDsBusy[TmpCoreWakeID] = 0;
-    __asm__("mfence");
-    while (1){
-        __asm__("hlt");
-    }
+    APAPICIDsBusy[TmpCoreWakeID]=0;
+    __asm__ volatile("sfence" ::: "memory");
+    __asm__ volatile("mfence" ::: "memory");
+    GOPClear(PACK_COLOR(0x00, 0x00, 0x00, 0xFF));
+    GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
+    GOPFlash();
+    while (1) __asm__ volatile("hlt");
 }
 
-void GlobalAMPInit(){
+#pragma clang optimize off
+__attribute__((target("no-avx,no-avx2"))) void GlobalAMPInit(){
     __asm__ volatile("cli");
-    outb(0x3F8,'I');
+
+    u64 sp = APStackSPs[TmpCoreWakeID];
+    u64 bp = APStackBPs[TmpCoreWakeID];
+    if (sp < 0x1000 || sp > 0x800000000ULL) {
+        while (1) __asm__ volatile("hlt");
+    }
     __asm__ volatile(
         "movq %0, %%rsp\n\t"
-        "xorq %%rbp, %%rbp\n\t"
-        :: "r"(APStackSPs[TmpCoreWakeID]) : "memory"
+        "movq %1, %%rbp\n\t"
+        :: "r"(sp), "r"(bp) : "memory"
     );
-    DebugStr("Stack At 0x");DebugU64(APStackSPs[TmpCoreWakeID]);DebugChar('\n');
+    DebugStr("Stack At 0x"); DebugU64(sp); DebugChar('\n');
     DebugStr("\nCore AMP Init Start\n");
-    
+
     InitIDTAP();
-    LoadGDT();
 
     DebugStr("Init Apic\n");
-    if (IsX2ApicSupported() && (rdmsr(0x1B) & (1ULL << 11)) == 0){
-        u64 apic_base = rdmsr(0x1B);
-        
-        if ((apic_base & (1ULL << 11)) == 0) {
-            apic_base &= ~(1ULL << 10);
-            wrmsr(0x1B, apic_base);
-            apic_base |= (1ULL << 11);
-            wrmsr(0x1B, apic_base);
-            apic_base |= (1ULL << 10);
-            wrmsr(0x1B, apic_base);
-            __asm__ volatile("mfence" ::: "memory");
-            if ((rdmsr(0x1B) & (1ULL<<11))==0) goto ApicInit;
+
+    DebugChar('0');
+    Bool need_x2apic = (APAPICIDs[TmpCoreWakeID] > 255);
+
+    Bool X2ApicSupported = 0;
+    u32 eax, ebx, ecx, edx;
+    __asm__ volatile("cpuid" : "=a"(eax),"=b"(ebx),"=c"(ecx),"=d"(edx) : "a"(1));
+    if (ecx & (1 << 21)) {
+        X2ApicSupported = 1;
+    }
+    DebugChar('1');
+
+    u64 base = rdmsr(0x1B);
+    Bool dmar_opt_out = false;
+    if (DMARAddr != 0) {
+        u8* dmar = (u8*)DMARAddr;
+        if (dmar[0]=='D' && dmar[1]=='M' && dmar[2]=='A' && dmar[3]=='R') {
+            u8 flags = dmar[0x25];
+            dmar_opt_out = ((flags & 0x3) == 0x3);
         }
+    }
+    DebugChar('2');
+
+    base |= (1ULL << 8);
+    if (X2ApicSupported && need_x2apic && !dmar_opt_out) {
+        base |=  (1ULL << 11);
+        base |=  (1ULL << 10);
+        wrmsr(0x1B, base);
+        __asm__ volatile("mfence" ::: "memory");
+    } else {
+        base |=  (1ULL << 11);
+        base &= ~(1ULL << 10);
+        wrmsr(0x1B, base);
+        __asm__ volatile("mfence" ::: "memory");
+    }
+    DebugChar('3');
+
+    u64 apic_base_now = rdmsr(0x1B);
+    Bool is_x2apic = ((apic_base_now & (1ULL << 11)) && (apic_base_now & (1ULL << 10)));
+    if (is_x2apic && X2ApicSupported) {
         u64 svr_val = rdmsr(0x80F);
         svr_val |= (1ULL << 8) | 0xFF;
         wrmsr(0x80F, svr_val);
         wrmsr(0x808, 0x0);
-    }else{
-        ApicInit:
+        __asm__ volatile("mfence" ::: "memory");
+    } else {
         DebugStr("ApicInit Core\n");
-        u64 apic_base = rdmsr(0x1B);
-        u64 apic_addr = apic_base & ~0xFFFULL;
+        u64 apic_addr = apic_base_now & ~0xFFFULL;
+        if (apic_addr < 0x1000 || apic_addr > 0xFFFFFFFFULL) {
+            DebugStr("APIC MMIO addr invalid, skip\n");
+        } else {
+            volatile u32* svr = (volatile u32*)(apic_addr + 0xF0);
+            u32 val = *svr;
+            val |= (1 << 8) | 0xFF;
+            *svr = val;
+            __asm__ volatile("mfence" ::: "memory");
 
-        volatile u32* svr = (volatile u32*)(apic_addr + 0xF0);
-        u32 val = *svr;
-        val |= (1 << 8) | 0xFF;
-        *svr = val;
-        __asm__ volatile("mfence" ::: "memory");
-
-        volatile u32* tpr = (volatile u32*)(apic_addr + 0x80);
-        *tpr = 0x00;
-        __asm__ volatile("mfence" ::: "memory");
+            volatile u32* tpr = (volatile u32*)(apic_addr + 0x80);
+            *tpr = 0x00;
+            __asm__ volatile("mfence" ::: "memory");
+        }
     }
+    DebugChar('4');
+    DebugStr("\nInited Apic\n");
 
     InitClock();
     FPUInit();
     SIMDInit();
 
-    SetCurrentCoreId(TmpCoreWakeID);
+    u32 safe_id = TmpCoreWakeID;
+    if (safe_id >= 288) safe_id = 0;
+    SetCurrentCoreId(safe_id);
 
-    DebugStr("Core "); DebugU64(TmpCoreWakeID); DebugStr(" Init.\n");
-    DebugStr("APIC ID=0x"); DebugU64(APAPICIDs[TmpCoreWakeID]); DebugChar('\n');
+    DebugStr("Core "); DebugU64(safe_id); DebugStr(" Init.\n");
+    DebugStr("APIC ID=0x"); DebugU64(APAPICIDs[safe_id]); DebugChar('\n');
 
     __asm__ volatile("sti");
 
     GlobalAMPMain();
 }
+#pragma clang optimize on
 
 void SendINIT(u32 TargetApicId) {
     DebugStr("SendINIT Start\n");
@@ -1267,6 +1321,11 @@ void SendINIT(u32 TargetApicId) {
 
 void InitAllCore(){
     MADTHeader* MADT = (MADTHeader*)MADTAddr;
+    if (!MADT) {
+        APAPICIDs[0] = GetCurrentApicId();
+        APCount = 1;
+        return;
+    }
     DebugStr("MADT=0x");DebugU64(MADTAddr);DebugChar('\n');
     u32 BspApicId = GetCurrentApicId();
 
@@ -1302,6 +1361,7 @@ void InitAllCore(){
             }
         }
         ptr += entry->Length;
+        if (APCount >= 288) break;
     }
 
     BspApicId = GetCurrentApicId();
@@ -1314,22 +1374,63 @@ void InitAllCore(){
         }
     }
 
-    if (need_x2apic && IsX2ApicSupported()) {
-        u64 apic_base = rdmsr(0x1B);
-        
-        if ((apic_base & (1ULL << 11)) == 0) {
-            apic_base &= ~(1ULL << 10);
-            wrmsr(0x1B, apic_base);
-            apic_base |= (1ULL << 11);
-            wrmsr(0x1B, apic_base);
-            apic_base |= (1ULL << 10);
-            wrmsr(0x1B, apic_base);
-            __asm__ volatile("mfence" ::: "memory");
+    Bool X2ApicSupported = 0;
+
+    u32 eax, ebx, ecx, edx;
+    __asm__ volatile("cpuid" : "=a"(eax),"=b"(ebx),"=c"(ecx),"=d"(edx) : "a"(1));
+    if (!(ecx & (1 << 21))) {
+        X2ApicSupported = 0;
+        goto InitNow;
+    }
+
+    u64 base = rdmsr(0x1B);
+
+    if (!(base & (1ULL << 8))) {
+        base |= (1ULL << 8);
+        base |= (1ULL << 11);
+        base &= ~(1ULL << 10);
+        wrmsr(0x1B, base);
+    }
+
+    X2ApicSupported = 1;
+
+    InitNow:
+    {
+        Bool dmar_opt_out = false;
+        if (DMARAddr != 0) {
+            u8* dmar = (u8*)DMARAddr;
+            if (dmar[0]=='D' && dmar[1]=='M' && dmar[2]=='A' && dmar[3]=='R') {
+                u8 flags = dmar[0x25];
+                dmar_opt_out = ((flags & 0x3) == 0x3);
+            }
+            if (need_x2apic && X2ApicSupported && !dmar_opt_out) {
+                u64 apic_base = rdmsr(0x1B);
+                if ((apic_base & (1ULL << 11)) == 0) {
+                    apic_base |= (1ULL << 10);
+                    apic_base |= (1ULL << 11);
+                    apic_base |= (1ULL << 8);
+                    wrmsr(0x1B, apic_base);
+                }
+            }else{
+                u32 w = 1;
+                for (u32 r = 1; r < APCount; r++) {
+                    if (APAPICIDs[r] <= 255) {
+                        APAPICIDs[w++] = APAPICIDs[r];
+                    } else {
+                        DebugStr("Drop APIC ID>255: "); DebugU64(APAPICIDs[r]); DebugChar('\n');
+                    }
+                }
+                APCount = w;
+            }
         }
     }
 
+    DebugStr("BspApicId=0x");DebugU64(BspApicId);DebugChar('\n');
     DebugStr("APBootloaderAddr=0x");DebugU64(APBootloaderAddr);DebugChar('\n');
     MemCopy((void*)0x7000, GlobalCoreInit, (u64)GlobalCoreInitEnd - (u64)GlobalCoreInit);
+    GOPClear(PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
+    GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
+    GOPFlash();
     __asm__ volatile("sfence");
     for (u32 LogicalIndex = 1; LogicalIndex < APCount; LogicalIndex++) {
         u32 TargetApicId = APAPICIDs[LogicalIndex];
@@ -1346,6 +1447,9 @@ void InitAllCore(){
         }
         DebugStr("Core Init Finish\n");
     }
+    GOPClear(PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
+    GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
+    GOPFlash();
 }
 
 typedef struct {
@@ -1357,16 +1461,38 @@ typedef struct {
 
 __attribute__((force_align_arg_pointer)) void kernel_main() {
     DebugStr("Jumped To KernelMain.\n");
-    InitStacks();
+    if (!GopBack) {
+        DebugStr("ERROR: GopBack is NULL!\n");
+        while(1) __asm__ volatile("cli\n\t hlt");
+    }
+    
+    GOPClear(PACK_COLOR(0x00, 0x00, 0x00, 0xFF));
+    GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
+    GOPFlash();
+
     GOPClear(PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
+    GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
     GOPFlash();
     MemSet((u8*)APAPICIDsBusy,0,288);
-    SetCurrentCoreId(0) ;
-    if (GetActualCoreCount()>0) InitAllCore();
+    SetCurrentCoreId(0);
+    DebugStr("Seted CoreID\n");
+    GOPClear(PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
+    GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
+    GOPFlash();
+    DebugStr("Init All Core\n");
+    GOPClear(PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
+    GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
+    GOPFlash();
+    if (GetActualCoreCount()>1) InitAllCore();
+    DebugStr("Inited All Core\n");
+    GOPClear(PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
+    GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
+    GOPFlash();
     WaitForAllAPNotBusy();
 
     DebugStr("Cores Init Finish\n");
     GOPClear(PACK_COLOR(0x00, 0x00, 0x00, 0xFF));
+    GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
     GOPFlash();
     
     if (!KernelPool.Head) {
@@ -1388,11 +1514,6 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     }
     DebugChar('\n');
 
-    if (!GopBack) {
-        DebugStr("ERROR: GopBack is NULL!\n");
-        while(1) __asm__ volatile("cli\n\t hlt");
-    }
-    
     GopMode.FrameBufferSize = GopInfo.PixelsPerScanLine * GopInfo.VerticalResolution * sizeof(u32);
     DebugStr("GopBack = ");
     DebugU64((u64)GopBack);
@@ -1536,8 +1657,6 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     DebugU64(GetTscFrequency());
     DebugChar('\n');
 
-    SystemBusySleepS(1);
-
     u64 config_after = hpet->rwConfigurationRegister;
     DebugStr("HPET Config after enable: 0x");
     DebugU64(config_after);
@@ -1640,8 +1759,6 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     DebugStr("TestStructObj->B[1][0] Base==0x");DebugU64((u64)&TestStructObj->B[1][0]);DebugChar('\n');
     Free(&KernelPool, TestStructObj);
 
-    InitDiskToFDFD(1);
-
     xHCITransferRequestBlock TRBs={{.U=0},{.U=0},{.CycleBit=1,.TRBType=9}};
     SendCommandRing(KernelXHCI,TRBs);
 
@@ -1677,15 +1794,15 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     InputCtx->InputControl.Field1.U = (1U << 0) | (1U << 1);
     InputCtx->InputControl.Field2.U = 0;
 
-    u32 portNum = 5;
+    u32 PortNum = 5;
     InputCtx->SlotContext.SlotField0.RouteString = 0;
-    InputCtx->SlotContext.SlotField0.Speed = KernelXHCI->OperationalRegs->PORTS[portNum-1].PORTSC.rosPortSpeed;
+    InputCtx->SlotContext.SlotField0.Speed = KernelXHCI->OperationalRegs->PORTS[PortNum-1].PORTSC.rosPortSpeed;
     InputCtx->SlotContext.SlotField0.MultiTT = 0;
     InputCtx->SlotContext.SlotField0.Hub = 0;
     InputCtx->SlotContext.SlotField0.ContextEntries = 1;
 
     InputCtx->SlotContext.SlotField1.MaxExitLatency = 0;
-    InputCtx->SlotContext.SlotField1.RootHubPortNumber = portNum;
+    InputCtx->SlotContext.SlotField1.RootHubPortNumber = PortNum;
     InputCtx->SlotContext.SlotField1.NumberOfPorts = 0;
 
     InputCtx->SlotContext.SlotField2.ParentHubSlotID = 0;
@@ -1728,17 +1845,6 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     DebugStr("After AddrDev: ERDP = 0x"); DebugU64(KernelXHCI->RuntimeRegs->Interrupter[0].ERDP.U); DebugChar('\n');
     DebugStr("After AddrDev: USBSTS = 0x"); DebugU32(KernelXHCI->OperationalRegs->USBSTS.U); DebugChar('\n');
 
-    IcrLow  = (volatile u32*)0xFEE00300;
-    IcrHigh = (volatile u32*)0xFEE00310;
-    while (*IcrLow & (1 << 12)) __asm__("pause");
-    *IcrHigh = 0;
-    *IcrLow  = 0x00004000 | 0xED;
-
-    DebugStr("KernelFonts['a']=\n"); 
-    for (int r = 0; r < 19; r++) {
-        DebugU64(KernelFonts['A'][r]); DebugChar('\n');
-    }
-
     u64 LastFrameTime = SystemGetTimeNano();
     while (1){
         WaitForEvent();
@@ -1749,7 +1855,8 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
                     msg,
                     PACK_COLOR(0x00, 0x00, 0x00, 0x00),
                     PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
-                    KernelFonts);
+                    KernelFonts,
+                    0);
         }
         Now = SystemGetTimeNano();
         
@@ -1758,10 +1865,12 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
         TaskPoll();
 
         GOPRectFill((u32[2]){0, GopInfo.HorizontalResolution}, (u32[2]){0, 21}, PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
-        GOPString(4,2,"Neuro-SamaOS :>)",PACK_COLOR(0x00, 0x00, 0x00, 0x00),PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),KernelFonts);
+        GOPString(4,2,"Neuro-SamaOS :>)",PACK_COLOR(0x00, 0x00, 0x00, 0x00),PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),KernelFonts, 0);
 
         GOPRectFill((u32[2]){GlobalPS2Mouse.X-5,GlobalPS2Mouse.X+5}, (u32[2]){GlobalPS2Mouse.Y-5,GlobalPS2Mouse.Y+5}, PACK_COLOR(0x00, 0x00, 0x00, 0xFF));
         GOPRectFill((u32[2]){GlobalPS2Mouse.X-4,GlobalPS2Mouse.X+4}, (u32[2]){GlobalPS2Mouse.Y-4,GlobalPS2Mouse.Y+4}, PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF));
+        
+        GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
         
         GOPFlash();
 

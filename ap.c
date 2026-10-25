@@ -2,9 +2,10 @@
 #include "int.h"
 #include "CpuInfo.h"
 #include "clock.h"
+#include "str.h"
 
-volatile u64 APStackSPs[288];
-volatile u64 APStackBPs[288];
+__attribute__((aligned(16)))volatile u64 APStackSPs[288];
+__attribute__((aligned(16)))volatile u64 APStackBPs[288];
 volatile u32 APAPICIDs[288];
 __attribute__((aligned(8))) volatile u8 APAPICIDsBusy[288];
 
@@ -91,7 +92,9 @@ u32 GetCurrentCoreId(void) {
 }
 
 void SetCurrentCoreId(u32 CoreId) {
-    __asm__ volatile("wrmsr" : : "c"(0xC0000103), "a"(CoreId), "d"(0));
+    CpuInfoResult CPUMakerStringRegs = CpuInfo(0, 0);
+    if (MemCmp(((void*)(((u64)&CPUMakerStringRegs)+4)), "GenuineIntel", 12)) __asm__ volatile("wrmsr" : : "c"(0x10B), "a"(CoreId), "d"(0));
+    else __asm__ volatile("wrmsr" : : "c"(0xC0000103), "a"(CoreId), "d"(0));
 }
 
 void WaitForAllAPNotBusy(){

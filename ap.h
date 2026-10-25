@@ -3,8 +3,8 @@
 #include "int.h"
 #include "clock.h"
 
-extern volatile u64 APStackSPs[288];
-extern volatile u64 APStackBPs[288];
+__attribute__((aligned(16))) extern volatile u64 APStackSPs[288];
+__attribute__((aligned(16)))extern volatile u64 APStackBPs[288];
 extern volatile u32 APAPICIDs[288];
 extern volatile u8 APAPICIDsBusy[288];
 

@@ -5,6 +5,10 @@
 
 static const char hex[]="0123456789ABCDEF";
 
+char ScreenDebug[1501]="\0";
+u64 ScreenDebugCurX=0;
+volatile u8 DebugCharLock=0;
+
 void DebugInit(void) {
     outb(0x3F8 + 1, 0x00);
     outb(0x3F8 + 3, 0x80);
@@ -18,12 +22,20 @@ void DebugInit(void) {
 }
 
 void DebugChar(const char C) {
+    while (DebugCharLock) __asm__("pause");
+    DebugCharLock=1;
     outb(0x3F8, (u8)C);
+    ScreenDebug[ScreenDebugCurX]=C;
+    ScreenDebugCurX=(ScreenDebugCurX+1)%1500;
+    if (ScreenDebugCurX!=0) ScreenDebug[ScreenDebugCurX] = '\0';
+    DebugCharLock=0;
 }
 
 void DebugStr(const char *S){
     if (!S) return;
-    while (*S) DebugChar(*S++);
+    while (*S) {
+        DebugChar(*S++);
+    }
 }
 
 void DebugU64(u64 LLU) {

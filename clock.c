@@ -105,6 +105,11 @@ u64 SystemGetTime(void) {
     return (tsc * g_tsc_to_us_mult) >> g_tsc_shift;
 }
 
+u64 SystemGetTimeUs(void) {
+    u64 tsc = rdtsc_serialized() - g_tsc_boot_offset;
+    return (tsc * g_tsc_to_us_mult) >> g_tsc_shift;
+}
+
 u64 SystemGetTimeMillis(void) {
     u64 tsc = rdtsc_serialized() - g_tsc_boot_offset;
     return (tsc * g_tsc_to_ms_mult) >> g_tsc_shift;
@@ -146,7 +151,6 @@ void SystemBusySleepMs(u64 Time) {
 
 void SystemBusySleepS(u64 Time) {
     u64 target = rdtsc_serialized() + Time * g_tsc_frequency;
-    DebugStr("Rdtsc=0x");DebugU64(rdtsc_serialized());DebugChar('\n');
     while (rdtsc_serialized() < target) {
         __asm__("pause");
     }

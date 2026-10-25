@@ -14,7 +14,7 @@ u64 HPET10MsTicks=0;
 
 extern RegContext MainGlobalContext;
 
-u64 GetAcpiAddrUEFI(EFI_BOOT_SERVICES* bs, u64 *Size, u64 *FADTAddr, u64 *DSDTAddr, u64* HPETAddr, u64* MADTAddr){
+u64 GetAcpiAddrUEFI(EFI_BOOT_SERVICES* bs, u64 *Size, u64 *FADTAddr, u64 *DSDTAddr, u64* HPETAddr, u64* MADTAddr, u64* DMARAddr){
     UINTN MemoryMapSize = 0;
     EFI_MEMORY_DESCRIPTOR *MemMap = NULL;
     UINTN MapKey, DescriptorSize;
@@ -54,6 +54,9 @@ u64 GetAcpiAddrUEFI(EFI_BOOT_SERVICES* bs, u64 *Size, u64 *FADTAddr, u64 *DSDTAd
                 }
                 if (*(((u32*)(AcpiAddr+Idx))) == 0x43495041) {
                     *MADTAddr = (u64)(AcpiAddr+Idx);
+                }
+                if (*(((u32*)(AcpiAddr+Idx))) == 0x52414D44) {
+                    *DMARAddr = (u64)(AcpiAddr+Idx);
                 }
             }
         }

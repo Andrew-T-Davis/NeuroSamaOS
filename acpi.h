@@ -99,7 +99,7 @@ typedef struct {
 extern u64 HPETFreqHz;
 extern u64 HPET10MsTicks;
 
-u64 GetAcpiAddrUEFI(EFI_BOOT_SERVICES* bs, u64 *Size, u64 *FADTAddr, u64 *DSDTAddr, u64* HPETAddr, u64* MADTAddr);
+u64 GetAcpiAddrUEFI(EFI_BOOT_SERVICES* bs, u64 *Size, u64 *FADTAddr, u64 *DSDTAddr, u64* HPETAddr, u64* MADTAddr, u64* DMARAddr);
 void ReBoot(u64 FADTAddr);
 void ShutDown(u64 FADTAddr, u64 DSDTAddr);
 u64 GetHPETMMIO(u64 HPETAddr);

@@ -126,11 +126,6 @@ void XHCIFuncInt(){
         LocalApicEOI();
         return;
     }
-    if (!Ctrl->RuntimeRegs->Interrupter[0].IMAN.rw1cInterruptPending) {
-        DebugStr("!Ctrl->RuntimeRegs->Interrupter[0].IMAN.rw1cInterruptPending==1\n");
-        LocalApicEOI();
-        return;
-    }
     PrintRegsValue(Ctrl);
     Ctrl->RuntimeRegs->Interrupter[0].IMAN.rw1cInterruptPending = 1;
 
@@ -351,6 +346,8 @@ xHCIController* InitXHCI() {
     DebugStr("sizeof(ERST entry) = "); DebugU32(sizeof(xHCIEventRingSegmentTableEntry)); DebugChar('\n');
 
     Ctrl->RuntimeRegs->Interrupter[0].IMAN.rw1cInterruptPending = 1;
+    Ctrl->RuntimeRegs->Interrupter[0].IMAN.rwInterruptEnable = 0;
+    Ctrl->OperationalRegs->USBCMD.rwInterrupterEnable=0;
 
     Ctrl->OperationalRegs->USBCMD.rwRunStop = 1;
     while (Ctrl->OperationalRegs->USBSTS.roHCHalted) __asm__("pause");
@@ -370,8 +367,9 @@ xHCIController* InitXHCI() {
         
         Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1csPortResetChange = 1;
     }
-    Ctrl->OperationalRegs->USBCMD.rwInterrupterEnable=1;
+    Ctrl->RuntimeRegs->Interrupter[0].IMAN.rw1cInterruptPending = 1;
     Ctrl->RuntimeRegs->Interrupter[0].IMAN.rwInterruptEnable=1;
+    Ctrl->OperationalRegs->USBCMD.rwInterrupterEnable=1;
 
     DUMP_STS("after ports");
 

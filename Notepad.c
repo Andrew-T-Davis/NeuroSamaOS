@@ -521,7 +521,8 @@ void GlobalNotepadDraw(void* Self) {
         title_buf,
         PACK_COLOR(0x0000, 0x0000, 0x0000, 0x0000),
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
-        KernelFonts
+        KernelFonts,
+        0
     );
 
     u32 EditorHeight = (u32)WinSelf->Base.h - 38;
@@ -563,7 +564,8 @@ void GlobalNotepadDraw(void* Self) {
             line_num_str,
             PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
             PACK_COLOR(0x88, 0x88, 0x88, 0xFF),
-            KernelFonts
+            KernelFonts,
+        0
         );
     }
 
@@ -634,7 +636,8 @@ void GlobalNotepadDraw(void* Self) {
         display_buf,
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
         PACK_COLOR(0x00, 0x00, 0x00, 0xFF),
-        KernelFonts
+        KernelFonts,
+        0
     );
 
     if (TextSelf->CursorVisible || TextSelf->IsCommandMode) {
@@ -698,7 +701,8 @@ void GlobalNotepadDraw(void* Self) {
         status_str,
         PACK_COLOR(0xDD, 0xDD, 0xDD, 0xFF),
         PACK_COLOR(0x33, 0x33, 0x33, 0xFF),
-        KernelFonts
+        KernelFonts,
+        0
     );
 }
 

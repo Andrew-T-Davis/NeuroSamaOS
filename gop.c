@@ -199,7 +199,7 @@ void GOPChar(u32 x, u32 y, u16 Char, u32 Back, u32 Front, u16 Font[65536][19]) {
     }
 }
 
-void GOPString(u32 x, u32 y, char *String, u32 Back, u32 Front, u16 Font[65536][19]) {
+void GOPString(u32 x, u32 y, char *String, u32 Back, u32 Front, u16 Font[65536][19], Bool RightBreakOrEnter) {
     u32 NewX = x, NewY = y;
     if (x >= GopInfo.HorizontalResolution || y >= GopInfo.VerticalResolution ||
         x + 8 > GopInfo.HorizontalResolution || y + 19 > GopInfo.VerticalResolution) return;
@@ -234,13 +234,19 @@ void GOPString(u32 x, u32 y, char *String, u32 Back, u32 Front, u16 Font[65536][
 
         u32 Gw = (cp < 0x80) ? 8 : 16;
 
-        if (NewX + Gw > GopInfo.HorizontalResolution) break;
+        if (NewX + Gw > GopInfo.HorizontalResolution) {
+            if (RightBreakOrEnter) {
+                NewX = x;
+                NewY += 19;
+            }
+            else break;
+        }
         GOPChar(NewX, NewY, (u16)cp, Back, Front, Font);
         NewX += Gw;
     }
 }
 
-void GOPStringWH(u32 x, u32 y, u32 w, u32 h, char* String, u32 Back, u32 Front, u16 Font[65536][19]) {
+void GOPStringWH(u32 x, u32 y, u32 w, u32 h, char* String, u32 Back, u32 Front, u16 Font[65536][19], Bool RightBreakOrEnter) {
     u32 NewX = x;
     u32 NewY = y;
     if (x >= GopInfo.HorizontalResolution || y >= GopInfo.VerticalResolution) return;
@@ -290,7 +296,13 @@ void GOPStringWH(u32 x, u32 y, u32 w, u32 h, char* String, u32 Back, u32 Front, 
 
         u32 Gw = (cp < 0x80) ? 8 : 16;
 
-        if ((NewX + Gw >= x + w) || (NewX >= x + w)) break;
+        if ((NewX + Gw >= x + w) || (NewX >= x + w)) {
+            if (RightBreakOrEnter) {
+                NewX = x;
+                NewY += 19;
+            }
+            else break;
+        }
         GOPChar(NewX, NewY, (u16)cp, Back, Front, Font);
         NewX += Gw;
 
