@@ -1,3 +1,4 @@
+#include "CpuInfo.h"
 #include "RandomSomething.h"
 #include "ahci.h"
 #include "efi.h"
@@ -484,6 +485,7 @@ u32 SelectResolution(EFI_SYSTEM_TABLE* sys) {
     }
     
     Start:
+    sys->ConOut->EnableCursor(sys->ConOut, 0);
     sys->ConOut->ClearScreen(sys->ConOut);
     sys->ConOut->SetCursorPosition(sys->ConOut, 0, 0);
     sys->ConOut->OutputString(sys->ConOut, L"Available Resolutions:\n\r\n\r");
@@ -497,7 +499,7 @@ u32 SelectResolution(EFI_SYSTEM_TABLE* sys) {
         PrintU64ToConOut(sys, Resolutions[i].Height);
         sys->ConOut->OutputString(sys->ConOut, L"\n\r");
     }
-    
+    sys->ConOut->EnableCursor(sys->ConOut, 1);
     sys->ConOut->OutputString(sys->ConOut, L"\n\rEnter resolution number: ");
     
     u16 InputBuffer[16];
@@ -565,12 +567,73 @@ u32 SelectResolution(EFI_SYSTEM_TABLE* sys) {
 }
 
 #pragma clang optimize off
-__attribute__((target("no-avx,no-avx2")))
+__attribute__((target("no-avx,no-avx2,no-sse3,no-sse2,no-sse")))
 EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
-    SIMDInit();
+    DebugInit();
+    CpuInfoResult CpuID0;
+    __asm__ volatile (
+        "pushq %%rbx\n\t"
+        "cpuid\n\t"
+        "movl %%ebx, %1\n\t"
+        "popq %%rbx\n\t"
+        : "=a" (CpuID0.Eax),
+          "=b" (CpuID0.Ebx),
+          "=c" (CpuID0.Ecx),
+          "=d" (CpuID0.Edx)
+        : "a" (0), 
+          "c" (0)
+
+    );
+    CpuInfoResult CpuID1;
+    __asm__ volatile (
+        "pushq %%rbx\n\t"
+        "cpuid\n\t"
+        "movl %%ebx, %1\n\t"
+        "popq %%rbx\n\t"
+        : "=a" (CpuID1.Eax),
+          "=b" (CpuID1.Ebx),
+          "=c" (CpuID1.Ecx),
+          "=d" (CpuID1.Edx)
+        : "a" (1), 
+          "c" (0)
+    );
+    if (CpuID0.Eax >= 0x07) {
+        CpuInfoResult CpuID2;
+        __asm__ volatile (
+            "pushq %%rbx\n\t"
+            "cpuid\n\t"
+            "movl %%ebx, %1\n\t"
+            "popq %%rbx\n\t"
+            : "=a" (CpuID2.Eax),
+            "=b" (CpuID2.Ebx),
+            "=c" (CpuID2.Ecx),
+            "=d" (CpuID2.Edx)
+            : "a" (7), 
+            "c" (0)
+        );
+        DebugStr("Have AVX2\n");
+        SIMDInit();
+    } else {
+        DebugStr("No AVX2\n");
+        sys->ConOut->EnableCursor(sys->ConOut, 0);
+        sys->ConOut->SetAttribute(sys->ConOut, EFI_WHITE);
+        sys->ConOut->ClearScreen(sys->ConOut);
+        sys->ConOut->SetCursorPosition(sys->ConOut, 0, 0);
+        sys->ConOut->OutputString(sys->ConOut, L"Your CPU havent AVX2/AVX, Please replace it with a CPU that supports AVX2.\n\r");
+        sys->ConOut->OutputString(sys->ConOut, L"Press A: Return To UEFI Boot Menu\r\n");
+        sys->ConOut->OutputString(sys->ConOut, L"Press B: Try Next Boot Options\r\n");
+        sys->ConOut->OutputString(sys->ConOut, L"Press Any Other Key: Shutdown\r\n");
+        EFI_INPUT_KEY Key;
+        u64 EventIndex;
+        sys->BootServices->WaitForEvent(1, &sys->ConIn->WaitForKey, &EventIndex);
+        sys->ConIn->ReadKeyStroke(sys->ConIn, &Key);
+        
+        if (Key.UnicodeChar==L'A' || Key.UnicodeChar==L'a') sys->RuntimeServices->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
+        else if (Key.UnicodeChar==L'B' || Key.UnicodeChar==L'b') sys->BootServices->Exit(image, EFI_ABORTED, 0, NULL);
+        else sys->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
+    }
     bs=sys->BootServices;
 
-    DebugInit();
     FPUInit();
     CalibrateTscUsingStall();
     InitClock();
@@ -606,6 +669,39 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
         DebugU64(status);
         DebugChar(L'\n');
     }
+
+    u32 max_mode;
+    u32 best_mode = 0;
+    u32 best_columns = 0;
+    u32 best_rows = 0;
+    u8  found = 0;
+
+    max_mode = sys->ConOut->Mode->MaxMode;
+
+    for (u32 mode_number = 0; mode_number < max_mode; mode_number++) {
+        u32 columns = 0;
+        u32 rows = 0;
+
+        status = sys->ConOut->QueryMode(sys->ConOut, mode_number, &columns, &rows);
+
+        if (status == EFI_UNSUPPORTED)
+            continue;
+
+        if (status != EFI_SUCCESS)
+            return status;
+
+        if (!found || columns > best_columns) {
+            best_columns = columns;
+            best_rows = rows;
+            best_mode = mode_number;
+            found = 1;
+        }
+    }
+
+    if (!found) sys->ConOut->SetMode(sys->ConOut, 0);
+    else sys->ConOut->SetMode(sys->ConOut, best_mode);
+
+    (void)best_rows;
 
     bs->LocateProtocol(&GopGuid, NULL, (void **)&Gop);
 
@@ -645,6 +741,7 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
     DebugStr("Gop->Mode->Info->VerticalResolution = ");
     DebugU32(Gop->Mode->Info->VerticalResolution);
     DebugChar('\n');
+    sys->ConOut->EnableCursor(sys->ConOut, 0);
     if (GopInfo.PixelFormat == PixelBltOnly){
         EFI_INPUT_KEY Key;
         sys->ConOut->ClearScreen(sys->ConOut);
@@ -672,7 +769,11 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
     SystemMode=0;
     EFI_INPUT_KEY Key;
     Bool ModeSelected=0;
+    sys->ConOut->EnableCursor(sys->ConOut, 0);
+    sys->ConOut->SetCursorPosition(sys->ConOut, 0, 0);
+    sys->ConOut->ClearScreen(sys->ConOut);
     while (!ModeSelected){
+        sys->ConOut->EnableCursor(sys->ConOut, 0);
         sys->ConOut->SetAttribute(sys->ConOut, EFI_WHITE);
         sys->ConOut->ClearScreen(sys->ConOut);
         sys->ConOut->SetCursorPosition(sys->ConOut, 0, 0);
@@ -696,6 +797,7 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
         }
 
         u64 EventIndex;
+        sys->ConOut->EnableCursor(sys->ConOut, 0);
         sys->BootServices->WaitForEvent(1, &sys->ConIn->WaitForKey, &EventIndex);
         sys->ConIn->ReadKeyStroke(sys->ConIn, &Key);
 
@@ -714,6 +816,7 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
                 ModeSelected=1;
             }
         }
+        sys->ConOut->EnableCursor(sys->ConOut, 0);
     }
     sys->ConOut->ClearScreen(sys->ConOut);
     MemSet(KernelFonts, 0, sizeof(KernelFonts));

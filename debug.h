@@ -2,7 +2,7 @@
 
 #include "int.h"
 
-extern char ScreenDebug[1501];
+extern char ScreenDebug[1551];
 extern u64 ScreenDebugCurX;
 
 void DebugInit(void);

@@ -5,9 +5,10 @@
 
 static const char hex[]="0123456789ABCDEF";
 
-char ScreenDebug[1501]="\0";
+char ScreenDebug[1551]="\0";
 u64 ScreenDebugCurX=0;
 volatile u8 DebugCharLock=0;
+u64 EnterCount=0;
 
 void DebugInit(void) {
     outb(0x3F8 + 1, 0x00);
@@ -26,7 +27,12 @@ void DebugChar(const char C) {
     DebugCharLock=1;
     outb(0x3F8, (u8)C);
     ScreenDebug[ScreenDebugCurX]=C;
-    ScreenDebugCurX=(ScreenDebugCurX+1)%1500;
+    ScreenDebugCurX=(ScreenDebugCurX+1)%1550;
+    if (C=='\n') EnterCount++;
+    if (EnterCount>=30) {
+        EnterCount=0;
+        ScreenDebugCurX=0;
+    }
     if (ScreenDebugCurX!=0) ScreenDebug[ScreenDebugCurX] = '\0';
     DebugCharLock=0;
 }

@@ -188,6 +188,15 @@ typedef struct EFI_BOOT_SERVICES {
     EFI_STATUS (EFIAPI *LocateProtocol)(const EFI_GUID *Protocol, void *Registration, void **Interface);
 } EFI_BOOT_SERVICES;
 
+typedef struct {
+    u32  MaxMode;
+    u32  Mode;
+    u32  Attribute;
+    u32  CursorColumn;
+    u32  CursorRow;
+    Bool CursorVisible;
+} EFI_SIMPLE_TEXT_OUTPUT_MODE;
+
 typedef struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL;
 struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL {
     EFI_STATUS (EFIAPI *Reset)(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *This, u8 ExtendedVerification);
@@ -200,7 +209,8 @@ struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL {
     EFI_STATUS (EFIAPI *SetCursorPosition)(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *This, u32 Column, u32 Row);
     EFI_STATUS (EFIAPI *EnableCursor)(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *This, u8 Enable);
     
-    u32 Mode;
+    EFI_SIMPLE_TEXT_OUTPUT_MODE* Mode;
+
     u32 Attribute;
     u32 CursorColumn;
     u32 CursorRow;

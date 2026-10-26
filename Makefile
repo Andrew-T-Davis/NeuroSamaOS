@@ -137,7 +137,7 @@ run-kvm: boot.efi
 		$(QEMU_BASE) \
 		$(QEMU_AUDIO) \
 		-accel kvm \
-		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU @ 2.50GHz" \
+		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU QEMU  Sim" \
 		-d guest_errors,unimp -D qemu.log
 
 run-tcg: boot.efi 
@@ -149,7 +149,7 @@ run-tcg: boot.efi
 		$(QEMU_BASE) \
 		$(QEMU_AUDIO) \
 		-accel tcg \
-		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU @ 2.50GHz" \
+		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU QEMU  Sim" \
 		-d int,cpu_reset -D qemu.log
 
 debug-kvm: boot.efi 
@@ -161,7 +161,7 @@ debug-kvm: boot.efi
 		$(QEMU_BASE) \
 		$(QEMU_AUDIO) \
 		-accel kvm \
-		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU @ 2.50GHz" \
+		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU QEMU  Sim" \
 		-s -S -D qemu.log
 
 debug-tcg: boot.efi 
@@ -173,7 +173,7 @@ debug-tcg: boot.efi
 		$(QEMU_BASE) \
 		$(QEMU_AUDIO) \
 		-accel tcg \
-		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU @ 2.50GHz" \
+		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU QEMU  Sim" \
 		-s -S -D qemu.log
 
 run-speed-kvm: boot.efi 
@@ -209,7 +209,7 @@ run-kvm-ps2: boot.efi
 		$(QEMU_BASE-ps2) \
 		$(QEMU_AUDIO) \
 		-accel kvm \
-		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU @ 2.50GHz" \
+		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU QEMU  Sim" \
 		-d guest_errors,unimp -D qemu.log
 
 run-tcg-ps2: boot.efi 
@@ -221,8 +221,8 @@ run-tcg-ps2: boot.efi
 		$(QEMU_BASE-ps2) \
 		$(QEMU_AUDIO) \
 		-accel tcg \
-		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU @ 2.50GHz" \
-		-d int,cpu_reset -D qemu.log
+		-d int,cpu_reset -D qemu.log \
+		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU QEMU  Sim"
 
 debug-kvm-ps2: boot.efi 
 	mkdir -p $(EFI_BOOT_DIR)
@@ -233,7 +233,7 @@ debug-kvm-ps2: boot.efi
 		$(QEMU_BASE-ps2) \
 		$(QEMU_AUDIO) \
 		-accel kvm \
-		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU @ 2.50GHz" \
+		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU QEMU  Sim" \
 		-s -S -D qemu.log
 
 debug-tcg-ps2: boot.efi 
@@ -245,7 +245,7 @@ debug-tcg-ps2: boot.efi
 		$(QEMU_BASE-ps2) \
 		$(QEMU_AUDIO) \
 		-accel tcg \
-		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU @ 2.50GHz" \
+		-cpu Skylake-Client-v4,hle=off,rtm=off,+apic,-la57,model-id="Intel(R) Core(TM) i5-12400F CPU QEMU  Sim" \
 		-s -S -D qemu.log
 
 run-speed-kvm-ps2: boot.efi 
