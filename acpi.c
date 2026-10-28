@@ -325,7 +325,12 @@ void SetHPETMMIO(u64 HPETAddr){
     else HPETBase=DefineHPETBase;
 }
 
-void HPETISRFuncInt(void) {
+void HPETISRFuncIntJustWakeUpMainWhileDontDelThisFuckBecauseWillBeCrash(void) {
+    if (HPETBase<=0xFFF) {
+        MakeEvent();
+        LocalApicEOI();
+        return;
+    }
     AcpiHPETRegs *HPET = (AcpiHPETRegs*)HPETBase;
 
     HPET->rw1cInterruptStatusRegister = 1;
@@ -341,7 +346,7 @@ __attribute__((naked)) void HPETISR(){
         "pushq %%rbp\n\t" "pushq %%rsi\n\t" "pushq %%rdi\n\t"
         "pushq %%r8\n\t"  "pushq %%r9\n\t"  "pushq %%r10\n\t" "pushq %%r11\n\t"
         "pushq %%r12\n\t" "pushq %%r13\n\t" "pushq %%r14\n\t" "pushq %%r15\n\t"
-        "call HPETISRFuncInt\n\t"
+        "call HPETISRFuncIntJustWakeUpMainWhileDontDelThisFuckBecauseWillBeCrash\n\t"
         "popq %%r15\n\t" "popq %%r14\n\t" "popq %%r13\n\t" "popq %%r12\n\t"
         "popq %%r11\n\t" "popq %%r10\n\t" "popq %%r9\n\t"  "popq %%r8\n\t"
         "popq %%rdi\n\t" "popq %%rsi\n\t" "popq %%rbp\n\t" "popq %%rbx\n\t"
@@ -352,6 +357,7 @@ __attribute__((naked)) void HPETISR(){
 }
 
 void CalibrateHPET(void) {
+    if (HPETBase<=0xFFF) return;
     AcpiHPETRegs *hpet = (AcpiHPETRegs*)HPETBase;
 
     u32 period_fs = (u32)(hpet->roCapabilitiesAndIDRegister >> 32);
@@ -360,7 +366,7 @@ void CalibrateHPET(void) {
         return;
     }
 
-    HPET10MsTicks = 1000000000000ULL / period_fs;
+    HPET10MsTicks = 10000000000000ULL / period_fs;
     HPETFreqHz = HPET10MsTicks * 100;
     hpet->rwConfigurationRegister |= 1ULL;
 }

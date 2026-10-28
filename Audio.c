@@ -2,6 +2,7 @@
 #include "debug.h"
 #include "kmalloc.h"
 #include "int.h"
+#include "str.h"
 
 extern AllocPool KernelPool;
 
@@ -52,13 +53,8 @@ void InitAudioBuff(void) {
         GlobalAudioPCMNext[i * 2]     = val;
         GlobalAudioPCMNext[i * 2 + 1] = val;
     }
-    
-    for (u32 i = actual_samples; i < total_samples; i++) {
-        GlobalAudioPCM[i * 2]     = 0;
-        GlobalAudioPCM[i * 2 + 1] = 0;
-        GlobalAudioPCMNext[i * 2]     = 0;
-        GlobalAudioPCMNext[i * 2 + 1] = 0;
-    }
+    MemSet(GlobalAudioPCM, 0, BUFFER_TOTAL_BYTES);
+    MemSet(GlobalAudioPCMNext, 0, BUFFER_TOTAL_BYTES);
     
     GlobalAudioPCMSizeCountOfBytePlay = actual_samples * 4; 
     GlobalAudioPCMNextSizeCountOfBytePlay = actual_samples * 4;

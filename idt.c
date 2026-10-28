@@ -18,7 +18,7 @@ __attribute__((aligned(16))) static struct IDTR idtr;
 volatile u64 LastErrorCode = 0;
 volatile u64 LastVector = 0;
 volatile Bool IDTGotError = 0;
-volatile Bool InExceptionHandler = 0;
+volatile u16 InExceptionHandler = 0;
 volatile static u64 Cr2;
 volatile static u64 Cr3;
 
@@ -183,11 +183,11 @@ decode_modrm:
 }
 
 void handle_exception_fast(u64 vector, u64 error_code, u64 *rip, u64 *cs, u64 *rflags) {
-    if (InExceptionHandler) {
+    if (InExceptionHandler>=288) {
         outb_str(L"\nRECURSIVE EXCEPTION HALT,I am Sorry\n");
         while(1)__asm__ volatile("cli\n\t""hlt\n\t"); 
     }
-    InExceptionHandler = 1;
+    InExceptionHandler++;
     
     LastVector = vector;
     LastErrorCode = error_code;
@@ -225,7 +225,7 @@ void handle_exception_fast(u64 vector, u64 error_code, u64 *rip, u64 *cs, u64 *r
 
     outb_str(L"Skip Error Code. Your Code Is Shit.\n");
     
-    InExceptionHandler = 0;
+    InExceptionHandler--;
 }
 
 #define EXC_HANDLER_NO_ERROR(vector) \

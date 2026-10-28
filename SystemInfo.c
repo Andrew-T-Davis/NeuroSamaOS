@@ -92,6 +92,8 @@ void GlobalSystemInfoDraw(void* Self) {
                     "\tRepo *.c count: " "43" "\n"
                     "\tRepo *.h count: " "53" "\n"
                     "\tRepo *.s count: " "02" "\n"
+                    "\tSix-Seven!!!67!!" "!!" "\n"
+                    "\t關注！三連！投幣！"    "\n"
         ,
         PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF),
         PACK_COLOR(0x00, 0x00, 0x00, 0xFF),

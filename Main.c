@@ -69,8 +69,8 @@ u64 MADTAddr=0;
 u64 DMARAddr=0;
 u64 AcpiSize=0;
 u64 APCount=0;
-u32 TmpCoreWakeID=0;
-u64 TmpGlobalRSI=0;
+volatile u32 TmpCoreWakeID=0;
+volatile u64 TmpGlobalRSI=0;
 u64 APBootloaderAddr=0x100000;
 
 AllocPool KernelPool = { .Head=NULL};
@@ -709,7 +709,8 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
 
     EFI_STATUS Status = Gop->SetMode(Gop, SelectedMode);
 
-    while (1){
+    s64 timeout=100727;
+    while ((timeout--)>0){
         if (Gop->Mode->Mode != SelectedMode) {
             u32 CurrentMode = Gop->Mode->Mode;
             Status = Gop->SetMode(Gop, CurrentMode); 
@@ -726,6 +727,27 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
     if (Status != EFI_SUCCESS)
     {
         DebugStr("\r\n[NeuroSamaOS] GOP Init Faild.\n");
+        sys->ConOut->ClearScreen(sys->ConOut);
+        sys->ConOut->EnableCursor(sys->ConOut, 0);
+        sys->ConOut->SetCursorPosition(sys->ConOut, 0, 0);
+        sys->ConOut->SetAttribute(sys->ConOut, EFI_WHITE);
+        sys->ConOut->OutputString(sys->ConOut, 
+            L"[NeuroSamaOS] GOP Init Faild.\r\n");
+        sys->ConOut->OutputString(sys->ConOut, 
+            L"Press A: Return To UEFI Boot Menu\r\n");
+        sys->ConOut->OutputString(sys->ConOut, 
+            L"Press B: Try Next Boot Options\r\n");
+        sys->ConOut->OutputString(sys->ConOut, 
+            L"Press Any Other Key: Shutdown\r\n");
+
+        EFI_INPUT_KEY Key;
+        u64 EventIndex;
+        sys->BootServices->WaitForEvent(1, &sys->ConIn->WaitForKey, &EventIndex);
+        sys->ConIn->ReadKeyStroke(sys->ConIn, &Key);
+        
+        if (Key.UnicodeChar==L'A' || Key.UnicodeChar==L'a') sys->RuntimeServices->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
+        else if (Key.UnicodeChar==L'B' || Key.UnicodeChar==L'b') sys->BootServices->Exit(image, EFI_ABORTED, 0, NULL);
+        else sys->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
         while(1) __asm__ volatile("cli\n\t hlt");
     }
     MemCopy(&GopMode,Gop->Mode,sizeof(EFI_GOP_MODE));
@@ -750,7 +772,7 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
         sys->ConOut->OutputString(sys->ConOut, 
             L"You Fucking GPU Is Fucking PixelBltOnly Bro,\r\n");
         sys->ConOut->OutputString(sys->ConOut, 
-            L"Dont Use This Fucking Shit GPU, Buy A New One Pls Bro\r\n");
+            L"Dont Use This Fucking Shit GPU, Buy A New One Pls Bro, \r\n Or Dont Fucking Use VirtIO-GPU!!!!!! Its Fucking Shit!!!!!!!\r\n");
         sys->ConOut->OutputString(sys->ConOut, 
             L"\r\nPress A: Return To UEFI Boot Menu\r\n");
         sys->ConOut->OutputString(sys->ConOut, 
@@ -990,6 +1012,27 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
     u64 *pml5 = BuildDynamicPageTable(MaxAddress, TotalAvailableMemory, CodeStart, CodeEnd, RsvdStartAddrList, RsvdEndAddrList, RsvdCount);
     if (!pml5) {
         DebugStr("BuildDynamicPageTable failed!\n");
+        DebugStr("\r\n[NeuroSamaOS] GOP Init Faild.\n");
+        sys->ConOut->ClearScreen(sys->ConOut);
+        sys->ConOut->EnableCursor(sys->ConOut, 0);
+        sys->ConOut->SetCursorPosition(sys->ConOut, 0, 0);
+        sys->ConOut->SetAttribute(sys->ConOut, EFI_WHITE);
+        sys->ConOut->OutputString(sys->ConOut, 
+            L"BuildDynamicPageTable failed!\r\n");
+        sys->ConOut->OutputString(sys->ConOut, 
+            L"Press A: Return To UEFI Boot Menu\r\n");
+        sys->ConOut->OutputString(sys->ConOut, 
+            L"Press B: Try Next Boot Options\r\n");
+        sys->ConOut->OutputString(sys->ConOut, 
+            L"Press Any Other Key: Shutdown\r\n");
+
+        u64 EventIndex;
+        sys->BootServices->WaitForEvent(1, &sys->ConIn->WaitForKey, &EventIndex);
+        sys->ConIn->ReadKeyStroke(sys->ConIn, &Key);
+        
+        if (Key.UnicodeChar==L'A' || Key.UnicodeChar==L'a') sys->RuntimeServices->ResetSystem(EfiResetCold, EFI_SUCCESS, 0, NULL);
+        else if (Key.UnicodeChar==L'B' || Key.UnicodeChar==L'b') sys->BootServices->Exit(image, EFI_ABORTED, 0, NULL);
+        else sys->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
         while(1) __asm__ volatile("cli\n\t hlt");
     }
     
@@ -1039,17 +1082,6 @@ EFI_STATUS EFIAPI Cefi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *sys) {
     DebugStr("Mov pml4 to cr3.\n");
     LoadDynamicPageTable(pml5);
     __asm__("sfence");
-    DebugStr("Init Stack");
-    u64 CoreCount = GetActualCoreCount();
-    if (CoreCount > 288) CoreCount = 288;
-    if (CoreCount == 0) CoreCount = 1;
-    u64 PerCoreStack = (KERNEL_STACK_SIZE / CoreCount) & ~0xFULL;
-    if (PerCoreStack < 0x10000) PerCoreStack = 0x10000;
-
-    for (u64 i = 0; i < CoreCount; i++) {
-        APStackSPs[i] = (u64)KernelStack + (i + 1) * PerCoreStack;
-        APStackBPs[i] = (u64)KernelStack + (i + 1) * PerCoreStack;
-    }
     DebugStr("AllocStack.\n");
     GopBack = (u32*)(u64)AlignedAlloc(&KernelPool, GopInfo.PixelsPerScanLine * GopInfo.VerticalResolution * sizeof(u32), 64);
 
@@ -1281,7 +1313,7 @@ Bool IsX2ApicSupported(void) {
 __attribute__((target("no-avx,no-avx2")))
 void GlobalAMPMain(void) {
     __asm__ volatile("sti");
-    APAPICIDsBusy[TmpCoreWakeID]=0;
+    *((u8*)0x1000)=0;
     __asm__ volatile("sfence" ::: "memory");
     __asm__ volatile("mfence" ::: "memory");
     GOPClear(PACK_COLOR(0x00, 0x00, 0x00, 0xFF));
@@ -1293,10 +1325,12 @@ void GlobalAMPMain(void) {
 #pragma clang optimize off
 __attribute__((target("no-avx,no-avx2"))) void GlobalAMPInit(){
     __asm__ volatile("cli");
+    DebugStr("Entry GlobalAMPInit\n");
 
     u64 sp = APStackSPs[TmpCoreWakeID];
     u64 bp = APStackBPs[TmpCoreWakeID];
     if (sp < 0x1000 || sp > 0x800000000ULL) {
+        DebugStr("sp < 0x1000 || sp > 0x800000000ULL is true\n");
         while (1) __asm__ volatile("hlt");
     }
     __asm__ volatile(
@@ -1528,25 +1562,46 @@ void InitAllCore(){
         }
     }
 
+    DebugStr("Init Stack");
+    if (APCount > 288) APCount = 288;
+    if (APCount == 0) APCount = 1;
+    
+    u64 PerCoreStack = 0x10000;
+    
+    if (PerCoreStack * APCount > KERNEL_STACK_SIZE) {
+        PerCoreStack = (KERNEL_STACK_SIZE / APCount) & ~0xFULL;
+    }
+
+    for (u64 i = 0; i < APCount; i++) {
+        APStackSPs[i] = ((u64)KernelStack + (i + 1) * PerCoreStack) & ~0xFULL;
+        APStackBPs[i] = APStackSPs[i];
+    }
+
     DebugStr("BspApicId=0x");DebugU64(BspApicId);DebugChar('\n');
     DebugStr("APBootloaderAddr=0x");DebugU64(APBootloaderAddr);DebugChar('\n');
     MemCopy((void*)0x7000, GlobalCoreInit, (u64)GlobalCoreInitEnd - (u64)GlobalCoreInit);
+    __asm__ volatile("mfence" ::: "memory");
     GOPClear(PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
     GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
     GOPFlash();
-    __asm__ volatile("sfence");
-    for (u32 LogicalIndex = 1; LogicalIndex < APCount; LogicalIndex++) {
+    for (u32 LogicalIndex = 1; LogicalIndex < APCount && LogicalIndex < 288; LogicalIndex++) {
         u32 TargetApicId = APAPICIDs[LogicalIndex];
 
         TmpCoreWakeID = LogicalIndex; 
-        APAPICIDsBusy[LogicalIndex] = 1;
+        *((u8*)0x1000)=1;
+
+        __asm__ volatile("mfence" ::: "memory");
 
         SendSIPI(TargetApicId, 0x7000);
 
         DebugStr("\nSendSIPI Core\n");
 
-        while (APAPICIDsBusy[TmpCoreWakeID]) {
+        while (*((u8*)0x1000)) {
             __asm__("pause");
+            __asm__ volatile("mfence" ::: "memory");
+            GOPClear(PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
+            GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
+            GOPFlash();
         }
         DebugStr("Core Init Finish\n");
     }
@@ -1568,6 +1623,13 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
         DebugStr("ERROR: GopBack is NULL!\n");
         while(1) __asm__ volatile("cli\n\t hlt");
     }
+    APStackSPs[0]=((u64)KernelStack)+KERNEL_STACK_SIZE;
+    APStackBPs[0]=APStackSPs[0];
+    __asm__ volatile(
+        "movq %0, %%rsp\n\t"
+        "movq %1, %%rbp\n\t"
+        :: "r"(APStackSPs[0]), "r"(APStackBPs[0]) : "memory"
+    );
     
     GOPClear(PACK_COLOR(0x00, 0x00, 0x00, 0xFF));
     GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
@@ -1591,6 +1653,11 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     GOPClear(PACK_COLOR(0x00, 0xAA, 0xAA, 0xFF));
     GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
     GOPFlash();
+    __asm__ volatile(
+        "movq %0, %%rsp\n\t"
+        "movq %1, %%rbp\n\t"
+        :: "r"(APStackSPs[0]), "r"(APStackBPs[0]) : "memory"
+    );
     WaitForAllAPNotBusy();
 
     DebugStr("Cores Init Finish\n");
@@ -1705,6 +1772,16 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     DebugStr("HPET base from GetHPETMMIO: 0x");
     DebugU64(base);
     DebugChar('\n');
+    if (base==0){
+        DebugStr("HPET Base==0;");
+        GOPClear(PACK_COLOR(0xFF, 0x00, 0x00, 0xFF));
+        GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
+        GOPFlash();
+        while(1) __asm__(
+            "cli \n\t"
+            "hlt \n\t"
+        );
+    }
 
     AcpiHPETRegs *hpet = (AcpiHPETRegs*)base;
 
@@ -1736,21 +1813,21 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     u64 cfg = hpet->rwTimer0ConfigurationAndCapabilityRegister;
     if ((cfg >> 32) & (1 << 4)) {
         DebugStr("Have Pin 4\n");
-        cfg &= ~(0x3E0CULL); 
+        cfg &= ~((1ULL<<1)|(1ULL<<2)|(1ULL<<3)|(1ULL<<5)|(1ULL<<8)|(0x1FULL<<9)|(1ULL<<14)|(1ULL<<15));
         
-        cfg |= (4 << 9) | (1 << 2) | (1 << 4);
+        cfg |= (4 << 9) | (1 << 2) | (1 << 3) | (1 << 1);
         
         hpet->rwTimer0ConfigurationAndCapabilityRegister = cfg;
 
-        IOApicWrite(0x18, 0xEF, 0x0);
+        IOApicWrite(0x18, 0x8000EF, 0x0);
     } else {
-        cfg &= ~(0x1FULL << 9);
+        cfg &= ~((1ULL<<1)|(1ULL<<2)|(1ULL<<3)|(1ULL<<5)|(1ULL<<8)|(1ULL<<9)|(1ULL<<10)|(1ULL<<11)|(1ULL<<12)|(1ULL<<13)|(1ULL<<14)|(1ULL<<15));
 
-        cfg |= (1 << 2) | (1 << 4);
+        cfg |= (1 << 2) | (1 << 3) | (1 << 1);
 
         hpet->rwTimer0ConfigurationAndCapabilityRegister = cfg;
 
-        IOApicWrite(0x14, 0xEF, 0x0);
+        IOApicWrite(0x14, 0x8000EF, 0x0);
     }
     DebugStr("Timer0 Config: 0x");
     DebugU64(hpet->rwTimer0ConfigurationAndCapabilityRegister);
@@ -1769,15 +1846,10 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
 
     hpet->rwConfigurationRegister &= ~1ULL;
 
-    cfg = hpet->rwTimer0ConfigurationAndCapabilityRegister;
-    cfg |= (1ULL << 6);
-    hpet->rwTimer0ConfigurationAndCapabilityRegister = cfg;
-
-    u64 target_delay_us = 4166666ULL / 1000ULL;
+    u64 target_delay_us = 4166666ULL;
     u64 hpet_cycles = target_delay_us * HPETFreqHz / 1000000ULL;
 
-    u64 current_main = hpet->rwCounterValueRegister;
-    hpet->rwTimer0ComparatorValueRegister = current_main + hpet_cycles;
+    hpet->rwTimer0ComparatorValueRegister = hpet_cycles;
 
     hpet->rwConfigurationRegister |= 1ULL;
 
@@ -1789,9 +1861,14 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     TaskInit();
 
     GOPClear(PACK_COLOR(0x7F, 0x7F, 0x7F, 0xFF));
+    GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
     GOPFlash();
 
     InitRandomString();
+    GOPClear(PACK_COLOR(0x7F, 0x0, 0x7F, 0xFF));
+    GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
+    GOPFlash();
+
     DebugStr("Test Random String:\n");
     Size64 Time=rdrand()%26;
     for (Size64 Idx=0;Idx<Time;Idx++) {
@@ -1809,13 +1886,6 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
 
     DebugStr("Main Kernel Poll Loop.\n");
     u64 Now = SystemGetTimeNano();
-
-    InitAudioBuff();
-
-    __asm__ volatile("sti");
-    u64 rflags;
-    __asm__ volatile("pushfq; pop %0" : "=r"(rflags));
-    DebugStr("After sti: IF = "); DebugU32((rflags >> 9) & 1); DebugChar('\n');
 
     xHCIController* KernelXHCI=InitXHCI();
     DebugStr("KernelXHCI At=");DebugU64((u64)KernelXHCI);DebugChar('\n');
@@ -1843,6 +1913,10 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     
     MemSet((u8*)APAPICIDsBusy,0,288);
 
+    GOPClear(PACK_COLOR(0x0A, 0xA5, 0x50, 0xFF));
+    GOPStringWH(0, 0, 800, 600, ScreenDebug, PACK_COLOR(0, 0, 0, 0), PACK_COLOR(0xFF, 0xFF, 0xFF, 0xFF), KernelFonts, 1);
+    GOPFlash();
+
     hpet->rwConfigurationRegister |= 1ULL;
     DebugStr("HPET Enabled\n");
 
@@ -1850,8 +1924,6 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
 
     __asm__("int $0x21");
     Char=0;
-
-    MemSet(GopOut,0xA5,GopMode.FrameBufferSize);
 
     DebugStr("WelCome To Temple, User.\n");
 
@@ -1862,91 +1934,93 @@ __attribute__((force_align_arg_pointer)) void kernel_main() {
     DebugStr("TestStructObj->B[1][0] Base==0x");DebugU64((u64)&TestStructObj->B[1][0]);DebugChar('\n');
     Free(&KernelPool, TestStructObj);
 
-    xHCITransferRequestBlock TRBs={{.U=0},{.U=0},{.CycleBit=1,.TRBType=9}};
-    SendCommandRing(KernelXHCI,TRBs);
+    if (KernelXHCI){
+        xHCITransferRequestBlock TRBs={{.U=0},{.U=0},{.CycleBit=1,.TRBType=9}};
+        SendCommandRing(KernelXHCI,TRBs);
 
-    PrintRegsValue(KernelXHCI);
+        PrintRegsValue(KernelXHCI);
 
-    DebugStr("=== ICR test ===\n");
-    volatile u32* IcrLow  = (volatile u32*)0xFEE00300;
-    volatile u32* IcrHigh = (volatile u32*)0xFEE00310;
-    while (*IcrLow & (1 << 12)) __asm__("pause");
-    *IcrHigh = 0;
-    *IcrLow  = 0x00004000 | 0xED;
-    DebugStr("=== ICR sent ===\n");
+        DebugStr("=== ICR test ===\n");
+        volatile u32* IcrLow  = (volatile u32*)0xFEE00300;
+        volatile u32* IcrHigh = (volatile u32*)0xFEE00310;
+        while (*IcrLow & (1 << 12)) __asm__("pause");
+        *IcrHigh = 0;
+        *IcrLow  = 0x00004000 | 0xED;
+        DebugStr("=== ICR sent ===\n");
 
-    KernelXHCI->CommandRingCount=0;
+        KernelXHCI->CommandRingCount=0;
 
-    xHCITransferRequestBlock EnableSlotTRB = {0};
-    EnableSlotTRB.NormalTRBField2.TRBType = 9;
-    SendCommandRing(KernelXHCI, EnableSlotTRB);
+        xHCITransferRequestBlock EnableSlotTRB = {0};
+        EnableSlotTRB.NormalTRBField2.TRBType = 9;
+        SendCommandRing(KernelXHCI, EnableSlotTRB);
 
-    for (volatile u64 i = 0; i < 10000000; i++) __asm__("pause");
+        for (volatile u64 i = 0; i < 10000000; i++) __asm__("pause");
 
-    DebugStr("After EnableSlot: CommandRingCount = "); DebugU32(KernelXHCI->CommandRingCount); DebugChar('\n');
-    DebugStr("After EnableSlot: IMAN = 0x"); DebugU32(KernelXHCI->RuntimeRegs->Interrupter[0].IMAN.U); DebugChar('\n');
-    DebugStr("After EnableSlot: ERDP = 0x"); DebugU64(KernelXHCI->RuntimeRegs->Interrupter[0].ERDP.U); DebugChar('\n');
+        DebugStr("After EnableSlot: CommandRingCount = "); DebugU32(KernelXHCI->CommandRingCount); DebugChar('\n');
+        DebugStr("After EnableSlot: IMAN = 0x"); DebugU32(KernelXHCI->RuntimeRegs->Interrupter[0].IMAN.U); DebugChar('\n');
+        DebugStr("After EnableSlot: ERDP = 0x"); DebugU64(KernelXHCI->RuntimeRegs->Interrupter[0].ERDP.U); DebugChar('\n');
 
-    xHCIInputContext* InputCtx = (xHCIInputContext*)AlignedAlloc(&KernelPool, sizeof(xHCIInputContext), 64);
-    MemSet((u8*)InputCtx, 0, sizeof(xHCIInputContext));
+        xHCIInputContext* InputCtx = (xHCIInputContext*)AlignedAlloc(&KernelPool, sizeof(xHCIInputContext), 64);
+        MemSet((u8*)InputCtx, 0, sizeof(xHCIInputContext));
 
-    xHCITransferRequestBlock* EP0Ring = (xHCITransferRequestBlock*)AlignedAlloc(&KernelPool, 64 * sizeof(xHCITransferRequestBlock), 64);
-    MemSet((u8*)EP0Ring, 0, 64 * sizeof(xHCITransferRequestBlock));
+        xHCITransferRequestBlock* EP0Ring = (xHCITransferRequestBlock*)AlignedAlloc(&KernelPool, 64 * sizeof(xHCITransferRequestBlock), 64);
+        MemSet((u8*)EP0Ring, 0, 64 * sizeof(xHCITransferRequestBlock));
 
-    InputCtx->InputControl.Field0.U = 0;
-    InputCtx->InputControl.Field1.U = (1U << 0) | (1U << 1);
-    InputCtx->InputControl.Field2.U = 0;
+        InputCtx->InputControl.Field0.U = 0;
+        InputCtx->InputControl.Field1.U = (1U << 0) | (1U << 1);
+        InputCtx->InputControl.Field2.U = 0;
 
-    u32 PortNum = 5;
-    InputCtx->SlotContext.SlotField0.RouteString = 0;
-    InputCtx->SlotContext.SlotField0.Speed = KernelXHCI->OperationalRegs->PORTS[PortNum-1].PORTSC.rosPortSpeed;
-    InputCtx->SlotContext.SlotField0.MultiTT = 0;
-    InputCtx->SlotContext.SlotField0.Hub = 0;
-    InputCtx->SlotContext.SlotField0.ContextEntries = 1;
+        u32 PortNum = 5;
+        InputCtx->SlotContext.SlotField0.RouteString = 0;
+        InputCtx->SlotContext.SlotField0.Speed = KernelXHCI->OperationalRegs->PORTS[PortNum-1].PORTSC.rosPortSpeed;
+        InputCtx->SlotContext.SlotField0.MultiTT = 0;
+        InputCtx->SlotContext.SlotField0.Hub = 0;
+        InputCtx->SlotContext.SlotField0.ContextEntries = 1;
 
-    InputCtx->SlotContext.SlotField1.MaxExitLatency = 0;
-    InputCtx->SlotContext.SlotField1.RootHubPortNumber = PortNum;
-    InputCtx->SlotContext.SlotField1.NumberOfPorts = 0;
+        InputCtx->SlotContext.SlotField1.MaxExitLatency = 0;
+        InputCtx->SlotContext.SlotField1.RootHubPortNumber = PortNum;
+        InputCtx->SlotContext.SlotField1.NumberOfPorts = 0;
 
-    InputCtx->SlotContext.SlotField2.ParentHubSlotID = 0;
-    InputCtx->SlotContext.SlotField2.ParentPortNumber = 0;
-    InputCtx->SlotContext.SlotField2.TThinkTime = 0;
-    InputCtx->SlotContext.SlotField2.InterrupterTarget = 0;
+        InputCtx->SlotContext.SlotField2.ParentHubSlotID = 0;
+        InputCtx->SlotContext.SlotField2.ParentPortNumber = 0;
+        InputCtx->SlotContext.SlotField2.TThinkTime = 0;
+        InputCtx->SlotContext.SlotField2.InterrupterTarget = 0;
 
-    InputCtx->SlotContext.SlotField3.USBDeviceAddress = 0;
-    InputCtx->SlotContext.SlotField3.SlotState = 0;
+        InputCtx->SlotContext.SlotField3.USBDeviceAddress = 0;
+        InputCtx->SlotContext.SlotField3.SlotState = 0;
 
-    InputCtx->EndpointContext[0].Field0.EndPointState = 0;
-    InputCtx->EndpointContext[0].Field0.Mult = 0;
-    InputCtx->EndpointContext[0].Field0.MaxPrimaryStreams = 0;
-    InputCtx->EndpointContext[0].Field0.LinearStreamArray = 0;
-    InputCtx->EndpointContext[0].Field0.Interval = 0;
-    InputCtx->EndpointContext[0].Field0.MaxEndPointServiceTimeIntervalPayloadHigh = 0;
+        InputCtx->EndpointContext[0].Field0.EndPointState = 0;
+        InputCtx->EndpointContext[0].Field0.Mult = 0;
+        InputCtx->EndpointContext[0].Field0.MaxPrimaryStreams = 0;
+        InputCtx->EndpointContext[0].Field0.LinearStreamArray = 0;
+        InputCtx->EndpointContext[0].Field0.Interval = 0;
+        InputCtx->EndpointContext[0].Field0.MaxEndPointServiceTimeIntervalPayloadHigh = 0;
 
-    InputCtx->EndpointContext[0].Field1.ErrorCount = 3;
-    InputCtx->EndpointContext[0].Field1.EndPointType = 4;
-    InputCtx->EndpointContext[0].Field1.HostInititeDisable = 0;
-    InputCtx->EndpointContext[0].Field1.MaxBurstSize = 0;
-    InputCtx->EndpointContext[0].Field1.MaxPacketSize = 8;
+        InputCtx->EndpointContext[0].Field1.ErrorCount = 3;
+        InputCtx->EndpointContext[0].Field1.EndPointType = 4;
+        InputCtx->EndpointContext[0].Field1.HostInititeDisable = 0;
+        InputCtx->EndpointContext[0].Field1.MaxBurstSize = 0;
+        InputCtx->EndpointContext[0].Field1.MaxPacketSize = 8;
 
-    InputCtx->EndpointContext[0].Field2.U = ((u64)EP0Ring & ~0xFULL) | 1;
+        InputCtx->EndpointContext[0].Field2.U = ((u64)EP0Ring & ~0xFULL) | 1;
 
-    InputCtx->EndpointContext[0].Field3.AverageTRBLength = 8;
-    InputCtx->EndpointContext[0].Field3.MaxEndpointServiceTimeIntervalPayloadLow = 0;
+        InputCtx->EndpointContext[0].Field3.AverageTRBLength = 8;
+        InputCtx->EndpointContext[0].Field3.MaxEndpointServiceTimeIntervalPayloadLow = 0;
 
-    xHCITransferRequestBlock AddrDevTRB = {0};
-    AddrDevTRB.NormalTRBField0.Base = (u64)InputCtx;
-    AddrDevTRB.NormalTRBField1.U = ((u32)1 << 24);
-    AddrDevTRB.NormalTRBField2.TRBType = 11;
+        xHCITransferRequestBlock AddrDevTRB = {0};
+        AddrDevTRB.NormalTRBField0.Base = (u64)InputCtx;
+        AddrDevTRB.NormalTRBField1.U = ((u32)1 << 24);
+        AddrDevTRB.NormalTRBField2.TRBType = 11;
 
-    SendCommandRing(KernelXHCI, AddrDevTRB);
+        SendCommandRing(KernelXHCI, AddrDevTRB);
 
-    for (volatile u64 i = 0; i < 10000000; i++) __asm__("pause");
+        for (volatile u64 i = 0; i < 10000000; i++) __asm__("pause");
 
-    DebugStr("After AddrDev: CommandRingCount = "); DebugU32(KernelXHCI->CommandRingCount); DebugChar('\n');
-    DebugStr("After AddrDev: IMAN = 0x"); DebugU32(KernelXHCI->RuntimeRegs->Interrupter[0].IMAN.U); DebugChar('\n');
-    DebugStr("After AddrDev: ERDP = 0x"); DebugU64(KernelXHCI->RuntimeRegs->Interrupter[0].ERDP.U); DebugChar('\n');
-    DebugStr("After AddrDev: USBSTS = 0x"); DebugU32(KernelXHCI->OperationalRegs->USBSTS.U); DebugChar('\n');
+        DebugStr("After AddrDev: CommandRingCount = "); DebugU32(KernelXHCI->CommandRingCount); DebugChar('\n');
+        DebugStr("After AddrDev: IMAN = 0x"); DebugU32(KernelXHCI->RuntimeRegs->Interrupter[0].IMAN.U); DebugChar('\n');
+        DebugStr("After AddrDev: ERDP = 0x"); DebugU64(KernelXHCI->RuntimeRegs->Interrupter[0].ERDP.U); DebugChar('\n');
+        DebugStr("After AddrDev: USBSTS = 0x"); DebugU32(KernelXHCI->OperationalRegs->USBSTS.U); DebugChar('\n');
+    }
 
     u64 LastFrameTime = SystemGetTimeNano();
     while (1){

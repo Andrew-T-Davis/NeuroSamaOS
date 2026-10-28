@@ -80,7 +80,7 @@ void AHCIProcessReceivedFIS(AHCIController* controller, u8 port_idx) {
 
     u64 Fb = ((u64)port->PortFISBaseAddressUpper32Bits.U << 32) | (u64)port->PortFISBaseAddress.U;
     if (!Fb) return;
-
+    
     volatile u8* d2h_fis = (volatile u8*)(Fb + 0x40);
 
     if (d2h_fis[0] == 0x34) {
@@ -302,7 +302,6 @@ AHCIController* InitAHCI() {
         while ((Ctrl->Regs->PortRegisters[Idx].PortCommandAndStatus.roCommandListRunning ||
                 Ctrl->Regs->PortRegisters[Idx].PortCommandAndStatus.roFISReceiveRunning) && timeout--) {
             __asm__ volatile("pause" ::: "memory");
-            SystemBusySleepUs(10);
         }
         if (timeout <= 0) {
             DebugStr(" Stop timeout, force continue...\n");
@@ -346,7 +345,6 @@ AHCIController* InitAHCI() {
         timeout = 200727;
         while (!Ctrl->Regs->PortRegisters[Idx].PortCommandAndStatus.roFISReceiveRunning && timeout--) {
             __asm__ volatile("pause" ::: "memory");
-            SystemBusySleepUs(10);
         }
         if (timeout == 0) {
             DebugStr(" FRE timeout!\n");
@@ -402,7 +400,6 @@ AHCIController* InitAHCI() {
                 DebugStr(" IPM="); DebugU32(ipm); DebugChar('\n');
             }
             __asm__ volatile("pause" ::: "memory");
-            SystemBusySleepUs(10);
         }
         DebugStr(" SSTS after wait: 0x"); DebugU32(ssts); DebugChar('\n');
         if (!phy_ready) {
@@ -420,7 +417,6 @@ AHCIController* InitAHCI() {
         timeout = 727727;
         while ((Ctrl->Regs->PortRegisters[Idx].PortTaskFileData.U & 0x88) && timeout--) {
             __asm__ volatile("pause" ::: "memory");
-            SystemBusySleepUs(10);
         }
         u32 tfd = Ctrl->Regs->PortRegisters[Idx].PortTaskFileData.U;
         DebugStr(" PxTFD after wait: 0x"); DebugU32(tfd); DebugChar('\n');
@@ -436,7 +432,6 @@ AHCIController* InitAHCI() {
         timeout = 20727;
         while (!Ctrl->Regs->PortRegisters[Idx].PortCommandAndStatus.roCommandListRunning && timeout--) {
             __asm__ volatile("pause" ::: "memory");
-            SystemBusySleepUs(10);
         }
         if (timeout == 0) {
             DebugStr(" ST timeout!\n");
@@ -519,7 +514,6 @@ AHCIController* InitAHCI() {
         timeout = 200727;
         while ((Ctrl->Regs->PortRegisters[p].PortCommandIssue.rw1CommandsIssued & 0x1) && timeout--) {
             __asm__ volatile("pause" ::: "memory");
-            SystemBusySleepUs(10);
         }
 
         if (timeout <= 0) {

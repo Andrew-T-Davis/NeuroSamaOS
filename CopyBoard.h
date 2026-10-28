@@ -7,9 +7,9 @@ typedef struct {
     struct CopyObj *Pre;
     u64 Len;
     char Text[];
-} CopyObj;
+} CopyBoardObj;
 
 typedef struct {
-    CopyObj *Tail;
-    CopyObj *Head;
-} CopyObjRoot;
+    CopyBoardObj *Tail;
+    CopyBoardObj *Head;
+} CopyBoardObjRoot;

@@ -225,8 +225,23 @@ xHCIController* InitXHCI() {
 
     Ctrl->OperationalRegs->USBCMD.rwRunStop = 0;
     Ctrl->OperationalRegs->USBCMD.rwHostControllerReset = 1;
-    while (Ctrl->OperationalRegs->USBCMD.U & (1 << 1)) __asm__("pause");
-    while (Ctrl->OperationalRegs->USBSTS.roControllerNotReady) __asm__("pause");
+    Ctrl->OperationalRegs->USBCMD.rwHostControllerReset = 1;
+    u64 timeout = 100000000;
+    while (Ctrl->OperationalRegs->USBCMD.U & (1 << 1)) {
+        if (--timeout == 0) {
+            DebugStr("!!! xHCI Reset Timeout !!!\n");
+            return NULL;
+        }
+        __asm__("pause");
+    }
+    timeout = 100000000;
+    while (Ctrl->OperationalRegs->USBSTS.roControllerNotReady) {
+        if (--timeout == 0) {
+            DebugStr("!!! xHCI Not Ready Timeout !!!\n");
+            return NULL;
+        }
+        __asm__("pause");
+    }
 
     DebugStr("Controller Ready & Reset Completed:\n");
 
@@ -362,9 +377,23 @@ xHCIController* InitXHCI() {
         Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1csConnectStatusChange = 1;
         Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1sPortReset = 1;
         
-        while (Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1sPortReset) __asm__("pause");
-        while (!Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1csPortResetChange) __asm__("pause");
+        timeout = 100000000;
+        while (Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1sPortReset) {
+            if (--timeout == 0) {
+                DebugStr("!!! Port Reset Timeout on Port !!!\n");
+                break;
+            }
+            __asm__("pause");
+        }
         
+        timeout = 100000000;
+        while (!Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1csPortResetChange) {
+            if (--timeout == 0) {
+                DebugStr("!!! Port Reset Change Timeout on Port !!!\n");
+                break;
+            }
+            __asm__("pause");
+        }
         Ctrl->OperationalRegs->PORTS[Idx].PORTSC.rw1csPortResetChange = 1;
     }
     Ctrl->RuntimeRegs->Interrupter[0].IMAN.rw1cInterruptPending = 1;

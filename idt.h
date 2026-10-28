@@ -29,7 +29,7 @@ struct IDTR {
 extern volatile u64 LastErrorCode;
 extern volatile u64 LastVector;
 extern volatile Bool IDTGotError;
-extern volatile Bool InExceptionHandler;
+extern volatile u16 InExceptionHandler;
 
 void InitIDT();
 void InitIDTAP();
