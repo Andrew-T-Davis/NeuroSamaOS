@@ -85,12 +85,6 @@ make
 - **Terry A. Davis** – My Spiritual Mentor
 - **Intel Manuals** – The only documentation I used.
 
----
-
-## License
-
-MIT – Use it, break it, fix it, fork it.
-
 --
 
 # PS
