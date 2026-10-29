@@ -13,3 +13,5 @@ typedef struct {
     CopyBoardObj *Tail;
     CopyBoardObj *Head;
 } CopyBoardObjRoot;
+
+extern CopyBoardObjRoot KernelCopyBoard;

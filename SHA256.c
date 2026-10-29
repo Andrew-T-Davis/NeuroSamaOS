@@ -28,23 +28,7 @@ static const u32 K[64] = {
 };
 
 void SHA256(void* Buffer, void* Msg, u64 MsgSize) {
-    if (MsgSize >= 56) return;
-
-    u8 TmpBuffer[64];
-    MemSet(TmpBuffer, 0, 64);
-    MemCopy(TmpBuffer, Msg, MsgSize);
-    
-    TmpBuffer[MsgSize] = 0x80;
-
-    u64 MsgSizeBit = MsgSize * 8;
-    TmpBuffer[56] = (MsgSizeBit >> 56) & 0xFF;
-    TmpBuffer[57] = (MsgSizeBit >> 48) & 0xFF;
-    TmpBuffer[58] = (MsgSizeBit >> 40) & 0xFF;
-    TmpBuffer[59] = (MsgSizeBit >> 32) & 0xFF;
-    TmpBuffer[60] = (MsgSizeBit >> 24) & 0xFF;
-    TmpBuffer[61] = (MsgSizeBit >> 16) & 0xFF;
-    TmpBuffer[62] = (MsgSizeBit >>  8) & 0xFF;
-    TmpBuffer[63] = (MsgSizeBit >>  0) & 0xFF;
+    u8* M = (u8*)Msg;
 
     u32 H[8] = {
         0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A,
@@ -52,41 +36,137 @@ void SHA256(void* Buffer, void* Msg, u64 MsgSize) {
     };
 
     u32 W[64];
-    for (int i = 0; i < 16; i++) {
-        W[i] = ((u32)TmpBuffer[i * 4 + 0] << 24) |
-               ((u32)TmpBuffer[i * 4 + 1] << 16) |
-               ((u32)TmpBuffer[i * 4 + 2] << 8)  |
-               ((u32)TmpBuffer[i * 4 + 3] << 0);
-    }
-    for (int i = 16; i < 64; i++) {
-        W[i] = sigma1(W[i - 2]) + W[i - 7] + sigma0(W[i - 15]) + W[i - 16];
+    u8 Block[64];
+
+    u64 TotalLen = MsgSize;
+    u64 Offset = 0;
+
+    while (TotalLen - Offset >= 64) {
+        MemCopy(Block, M + Offset, 64);
+        Offset += 64;
+
+        for (int i = 0; i < 16; i++) {
+            W[i] = ((u32)Block[i * 4 + 0] << 24) |
+                   ((u32)Block[i * 4 + 1] << 16) |
+                   ((u32)Block[i * 4 + 2] << 8)  |
+                   ((u32)Block[i * 4 + 3] << 0);
+        }
+        for (int i = 16; i < 64; i++) {
+            W[i] = sigma1(W[i - 2]) + W[i - 7] + sigma0(W[i - 15]) + W[i - 16];
+        }
+
+        u32 a = H[0], b = H[1], c = H[2], d = H[3];
+        u32 e = H[4], f = H[5], g = H[6], h = H[7];
+
+        for (int i = 0; i < 64; i++) {
+            u32 T1 = h + Sigma1(e) + Ch(e, f, g) + K[i] + W[i];
+            u32 T2 = Sigma0(a) + Maj(a, b, c);
+            h = g; g = f; f = e; e = d + T1;
+            d = c; c = b; b = a; a = T1 + T2;
+        }
+
+        H[0] += a; H[1] += b; H[2] += c; H[3] += d;
+        H[4] += e; H[5] += f; H[6] += g; H[7] += h;
     }
 
-    u32 a = H[0];
-    u32 b = H[1];
-    u32 c = H[2];
-    u32 d = H[3];
-    u32 e = H[4];
-    u32 f = H[5];
-    u32 g = H[6];
-    u32 h = H[7];
+    u64 Remaining = TotalLen - Offset;
+    MemSet(Block, 0, 64);
+    MemCopy(Block, M + Offset, Remaining);
 
-    for (int i = 0; i < 64; i++) {
-        u32 T1 = h + Sigma1(e) + Ch(e, f, g) + K[i] + W[i];
-        u32 T2 = Sigma0(a) + Maj(a, b, c);
-        
-        h = g;
-        g = f;
-        f = e;
-        e = d + T1;
-        d = c;
-        c = b;
-        b = a;
-        a = T1 + T2;
+    u64 MsgSizeBit = TotalLen * 8;
+
+    if (Remaining < 56) {
+        Block[Remaining] = 0x80;
+        Block[56] = (MsgSizeBit >> 56) & 0xFF;
+        Block[57] = (MsgSizeBit >> 48) & 0xFF;
+        Block[58] = (MsgSizeBit >> 40) & 0xFF;
+        Block[59] = (MsgSizeBit >> 32) & 0xFF;
+        Block[60] = (MsgSizeBit >> 24) & 0xFF;
+        Block[61] = (MsgSizeBit >> 16) & 0xFF;
+        Block[62] = (MsgSizeBit >>  8) & 0xFF;
+        Block[63] = (MsgSizeBit >>  0) & 0xFF;
+
+        for (int i = 0; i < 16; i++) {
+            W[i] = ((u32)Block[i * 4 + 0] << 24) |
+                   ((u32)Block[i * 4 + 1] << 16) |
+                   ((u32)Block[i * 4 + 2] << 8)  |
+                   ((u32)Block[i * 4 + 3] << 0);
+        }
+        for (int i = 16; i < 64; i++) {
+            W[i] = sigma1(W[i - 2]) + W[i - 7] + sigma0(W[i - 15]) + W[i - 16];
+        }
+
+        u32 a = H[0], b = H[1], c = H[2], d = H[3];
+        u32 e = H[4], f = H[5], g = H[6], h = H[7];
+
+        for (int i = 0; i < 64; i++) {
+            u32 T1 = h + Sigma1(e) + Ch(e, f, g) + K[i] + W[i];
+            u32 T2 = Sigma0(a) + Maj(a, b, c);
+            h = g; g = f; f = e; e = d + T1;
+            d = c; c = b; b = a; a = T1 + T2;
+        }
+
+        H[0] += a; H[1] += b; H[2] += c; H[3] += d;
+        H[4] += e; H[5] += f; H[6] += g; H[7] += h;
+    } else {
+        Block[Remaining] = 0x80;
+
+        for (int i = 0; i < 16; i++) {
+            W[i] = ((u32)Block[i * 4 + 0] << 24) |
+                   ((u32)Block[i * 4 + 1] << 16) |
+                   ((u32)Block[i * 4 + 2] << 8)  |
+                   ((u32)Block[i * 4 + 3] << 0);
+        }
+        for (int i = 16; i < 64; i++) {
+            W[i] = sigma1(W[i - 2]) + W[i - 7] + sigma0(W[i - 15]) + W[i - 16];
+        }
+
+        u32 a = H[0], b = H[1], c = H[2], d = H[3];
+        u32 e = H[4], f = H[5], g = H[6], h = H[7];
+
+        for (int i = 0; i < 64; i++) {
+            u32 T1 = h + Sigma1(e) + Ch(e, f, g) + K[i] + W[i];
+            u32 T2 = Sigma0(a) + Maj(a, b, c);
+            h = g; g = f; f = e; e = d + T1;
+            d = c; c = b; b = a; a = T1 + T2;
+        }
+
+        H[0] += a; H[1] += b; H[2] += c; H[3] += d;
+        H[4] += e; H[5] += f; H[6] += g; H[7] += h;
+
+        MemSet(Block, 0, 64);
+        Block[56] = (MsgSizeBit >> 56) & 0xFF;
+        Block[57] = (MsgSizeBit >> 48) & 0xFF;
+        Block[58] = (MsgSizeBit >> 40) & 0xFF;
+        Block[59] = (MsgSizeBit >> 32) & 0xFF;
+        Block[60] = (MsgSizeBit >> 24) & 0xFF;
+        Block[61] = (MsgSizeBit >> 16) & 0xFF;
+        Block[62] = (MsgSizeBit >>  8) & 0xFF;
+        Block[63] = (MsgSizeBit >>  0) & 0xFF;
+
+        for (int i = 0; i < 16; i++) {
+            W[i] = ((u32)Block[i * 4 + 0] << 24) |
+                   ((u32)Block[i * 4 + 1] << 16) |
+                   ((u32)Block[i * 4 + 2] << 8)  |
+                   ((u32)Block[i * 4 + 3] << 0);
+        }
+        for (int i = 16; i < 64; i++) {
+            W[i] = sigma1(W[i - 2]) + W[i - 7] + sigma0(W[i - 15]) + W[i - 16];
+        }
+
+        a = H[0]; b = H[1]; c = H[2]; d = H[3];
+        e = H[4]; f = H[5]; g = H[6]; h = H[7];
+
+        for (int i = 0; i < 64; i++) {
+            u32 T1 = h + Sigma1(e) + Ch(e, f, g) + K[i] + W[i];
+            u32 T2 = Sigma0(a) + Maj(a, b, c);
+            h = g; g = f; f = e; e = d + T1;
+            d = c; c = b; b = a; a = T1 + T2;
+        }
+
+        H[0] += a; H[1] += b; H[2] += c; H[3] += d;
+        H[4] += e; H[5] += f; H[6] += g; H[7] += h;
     }
-
-    H[0] += a; H[1] += b; H[2] += c; H[3] += d;
-    H[4] += e; H[5] += f; H[6] += g; H[7] += h;
 
     u8* OutBuffer = (u8*)Buffer;
     for (int i = 0; i < 8; i++) {
@@ -95,16 +175,8 @@ void SHA256(void* Buffer, void* Msg, u64 MsgSize) {
         OutBuffer[i * 4 + 2] = (H[i] >>  8) & 0xFF;
         OutBuffer[i * 4 + 3] = (H[i] >>  0) & 0xFF;
     }
-    a=0;
-    b=0;
-    c=0;
-    d=0;
-    e=0;
-    f=0;
-    g=0;
-    h=0;
-    MemSet(H,0,32);
-    MemSet(W,0,128);
-    MsgSizeBit=0;
-    MemSet(TmpBuffer,0,64);
+
+    MemSet(H, 0, 32);
+    MemSet(W, 0, 256);
+    MemSet(Block, 0, 64);
 }
