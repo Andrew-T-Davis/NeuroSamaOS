@@ -23,7 +23,7 @@ ASArg = --target=x86_64-unknown-windows-gnu \
 
 LDArg = -m i386pep --entry=efi_main \
         --image-base=0x1000 --no-undefined \
-        --gc-sections --no-dynamicbase
+        --gc-sections --no-dynamicbase -Map=boot.map
 
 S_OBJS = $(wildcard *.s)
 C_OBJS = $(wildcard *.c)
